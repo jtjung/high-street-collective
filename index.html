@@ -1176,7 +1176,7 @@
       <!-- Card 1 -->
       <div class="result-card fade-up">
         <div class="result-meta">
-          <span class="result-type">Dental Practice · Manchester</span>
+          <span class="result-type">Dental Practice · London</span>
           <span class="result-badge">Active Client</span>
         </div>
         <div class="result-metrics">
@@ -1209,7 +1209,7 @@
       <!-- Card 2 -->
       <div class="result-card fade-up">
         <div class="result-meta">
-          <span class="result-type">Auto Repair Shop · Birmingham</span>
+          <span class="result-type">Auto Repair Shop · New York</span>
           <span class="result-badge">Active Client</span>
         </div>
         <div class="result-metrics">
@@ -1242,7 +1242,7 @@
       <!-- Card 3 -->
       <div class="result-card fade-up">
         <div class="result-meta">
-          <span class="result-type">Hair Salon · Edinburgh</span>
+          <span class="result-type">Hair Salon · London</span>
           <span class="result-badge">Active Client</span>
         </div>
         <div class="result-metrics">
@@ -1275,7 +1275,7 @@
       <!-- Card 4 -->
       <div class="result-card fade-up">
         <div class="result-meta">
-          <span class="result-type">Landscaping Company · Bristol</span>
+          <span class="result-type">Landscaping Company · London</span>
           <span class="result-badge">Active Client</span>
         </div>
         <div class="result-metrics">
@@ -1308,7 +1308,7 @@
       <!-- Card 5 -->
       <div class="result-card fade-up">
         <div class="result-meta">
-          <span class="result-type">Physiotherapy Clinic · Leeds</span>
+          <span class="result-type">Physiotherapy Clinic · New York</span>
           <span class="result-badge">Active Client</span>
         </div>
         <div class="result-metrics">
@@ -1558,31 +1558,32 @@
       </div>
       <div class="contact-form fade-up">
         <form id="contactForm" onsubmit="handleSubmit(event)">
+          <input type="hidden" name="_subject" value="New Strategy Call Request — High Street Collective" />
           <div class="form-row">
             <div class="form-group">
               <label>First Name</label>
-              <input type="text" placeholder="Jane" required />
+              <input type="text" name="firstName" placeholder="Jane" required />
             </div>
             <div class="form-group">
               <label>Last Name</label>
-              <input type="text" placeholder="Smith" required />
+              <input type="text" name="lastName" placeholder="Smith" required />
             </div>
           </div>
           <div class="form-group">
             <label>Business Email</label>
-            <input type="email" placeholder="jane@yourbusiness.com" required />
+            <input type="email" name="email" placeholder="jane@yourbusiness.com" required />
           </div>
           <div class="form-group">
             <label>Phone Number</label>
-            <input type="tel" placeholder="07700 900000" />
+            <input type="tel" name="phone" placeholder="07700 900000" />
           </div>
           <div class="form-group">
             <label>What type of business do you run?</label>
-            <input type="text" placeholder="e.g. Auto repair shop, dental clinic..." required />
+            <input type="text" name="business" placeholder="e.g. Auto repair shop, dental clinic..." required />
           </div>
           <div class="form-group">
             <label>What's your biggest digital challenge right now?</label>
-            <select required>
+            <select name="challenge" required>
               <option value="" disabled selected>Select one...</option>
               <option>I don't have a website yet</option>
               <option>My website is old or not working</option>
@@ -1596,15 +1597,15 @@
           </div>
           <div class="form-group">
             <label>Anything else you'd like us to know? (optional)</label>
-            <textarea placeholder="Tell us a little more about your situation..."></textarea>
+            <textarea name="message" placeholder="Tell us a little more about your situation..."></textarea>
           </div>
-          <button type="submit" class="btn-primary form-submit">
+          <button type="submit" id="submitBtn" class="btn-primary form-submit">
             Book My Free Strategy Call
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
         </form>
         <div class="success-msg" id="successMsg">
-          ✅ Thanks! We'll reach out within 1 business day to schedule your call.
+          ✅ Thanks! We'll be in touch within 1 business day to schedule your call.
         </div>
       </div>
     </div>
@@ -1663,11 +1664,31 @@
       if (!isOpen) item.classList.add('open');
     }
 
-    // Form submit
-    function handleSubmit(e) {
+    // Form submit — Formspree
+    async function handleSubmit(e) {
       e.preventDefault();
-      document.getElementById('contactForm').style.display = 'none';
-      document.getElementById('successMsg').style.display = 'block';
+      const form = e.target;
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+
+      try {
+        const res = await fetch('https://formspree.io/f/REPLACE_WITH_FORM_ID', {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { 'Accept': 'application/json' }
+        });
+        if (res.ok) {
+          form.style.display = 'none';
+          document.getElementById('successMsg').style.display = 'block';
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Try again — something went wrong';
+        }
+      } catch {
+        btn.disabled = false;
+        btn.textContent = 'Try again — something went wrong';
+      }
     }
 
     // Scroll animations
