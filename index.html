@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>High Street Collective — Digital Growth for UK Local Business</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #09090f;
+      --bg2: #0f0f1a;
+      --bg3: #13131f;
+      --surface: #1a1a2e;
+      --surface2: #1f1f35;
+      --border: rgba(255,255,255,0.07);
+      --accent: #6c63ff;
+      --accent2: #a78bfa;
+      --accent3: #38bdf8;
+      --green: #34d399;
+      --text: #f1f1f5;
+      --muted: #8585a4;
+      --muted2: #5a5a78;
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 0 5%;
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(9,9,15,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 8px rgba(167,139,250,0.5));
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 36px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-cta {
+      background: var(--accent);
+      color: #fff !important;
+      padding: 9px 22px;
+      border-radius: 8px;
+      font-weight: 600 !important;
+      transition: background 0.2s, transform 0.15s !important;
+    }
+    .nav-cta:hover { background: #5a52e8 !important; transform: translateY(-1px); }
+
+    .hamburger { display: none; flex-direction: column; gap: 5px; cursor: pointer; }
+    .hamburger span { width: 24px; height: 2px; background: var(--text); border-radius: 2px; transition: all 0.3s; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      padding: 120px 5% 80px;
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 60% 20%, rgba(108,99,255,0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 50% at 15% 80%, rgba(56,189,248,0.07) 0%, transparent 60%);
+    }
+
+    .grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 20%, transparent 80%);
+    }
+
+    .hero-content {
+      max-width: 760px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(108,99,255,0.12);
+      border: 1px solid rgba(108,99,255,0.3);
+      color: var(--accent2);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 7px 16px;
+      border-radius: 100px;
+      margin-bottom: 28px;
+    }
+
+    .hero-badge-dot {
+      width: 6px; height: 6px;
+      background: var(--accent2);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2.6rem, 5.5vw, 4.2rem);
+      font-weight: 700;
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      margin-bottom: 24px;
+      color: var(--text);
+    }
+
+    h1 .grad {
+      background: linear-gradient(135deg, #a78bfa, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 540px;
+      margin-bottom: 40px;
+      line-height: 1.7;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 14px 28px;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-primary:hover {
+      background: #5a52e8;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(108,99,255,0.35);
+    }
+
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 14px 24px;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .btn-ghost:hover {
+      border-color: rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 40px;
+      margin-top: 60px;
+      padding-top: 40px;
+      border-top: 1px solid var(--border);
+    }
+
+    .hero-stat-num {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .hero-stat-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── SECTION COMMON ── */
+    section { padding: 96px 5%; }
+
+    .section-eyebrow {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      margin-bottom: 14px;
+    }
+
+    h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+
+    .section-sub {
+      font-size: 1.05rem;
+      color: var(--muted);
+      max-width: 520px;
+      line-height: 1.7;
+    }
+
+    .section-header { margin-bottom: 56px; }
+
+    /* ── SOCIAL PROOF TICKER ── */
+    .ticker-wrap {
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 0;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .ticker-track {
+      display: inline-flex;
+      gap: 0;
+      animation: ticker 28s linear infinite;
+    }
+
+    .ticker-track:hover { animation-play-state: paused; }
+
+    @keyframes ticker {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 40px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .ticker-dot { color: var(--accent2); }
+
+    /* ── SERVICES ── */
+    #services { background: var(--bg2); }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .service-card {
+      background: var(--bg2);
+      padding: 36px 32px;
+      transition: background 0.2s;
+      position: relative;
+    }
+
+    .service-card:hover { background: var(--surface); }
+
+    .service-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 1.4rem;
+      margin-bottom: 20px;
+    }
+
+    .service-card h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .service-card p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .service-tag {
+      display: inline-block;
+      margin-top: 16px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent2);
+      background: rgba(108,99,255,0.1);
+      border: 1px solid rgba(108,99,255,0.2);
+      padding: 4px 10px;
+      border-radius: 100px;
+    }
+
+    /* ── HOW IT WORKS ── */
+    #how { background: var(--bg); }
+
+    .steps-wrap {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0;
+      position: relative;
+    }
+
+    .step {
+      padding: 36px 32px;
+      position: relative;
+    }
+
+    .step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 52px;
+      right: -1px;
+      width: 1px;
+      height: 40px;
+      background: linear-gradient(to bottom, var(--accent), transparent);
+    }
+
+    .step-num {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 3rem;
+      font-weight: 800;
+      color: rgba(108,99,255,0.15);
+      line-height: 1;
+      margin-bottom: 16px;
+    }
+
+    .step h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .step p {
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    /* ── RESULTS ── */
+    #results { background: var(--bg2); }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 20px;
+    }
+
+    .result-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+
+    .result-card:hover {
+      border-color: rgba(108,99,255,0.3);
+      transform: translateY(-3px);
+    }
+
+    .result-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent3));
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .result-card:hover::before { opacity: 1; }
+
+    .result-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .result-type {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted2);
+    }
+
+    .result-badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--green);
+      background: rgba(52,211,153,0.1);
+      border: 1px solid rgba(52,211,153,0.2);
+      padding: 3px 10px;
+      border-radius: 100px;
+    }
+
+    .result-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .metric {
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+    }
+
+    .metric-val {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: baseline;
+      gap: 3px;
+    }
+
+    .metric-arrow {
+      font-size: 1rem;
+      color: var(--green);
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .result-desc {
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.65;
+      border-top: 1px solid var(--border);
+      padding-top: 20px;
+    }
+
+    .result-services {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 16px;
+    }
+
+    .result-service {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--muted2);
+      background: var(--surface2);
+      padding: 4px 10px;
+      border-radius: 100px;
+    }
+
+    /* ── AUTOMATION ── */
+    #automation { background: var(--bg); }
+
+    .automation-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 72px;
+      align-items: center;
+    }
+
+    .whatsapp-mockup {
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.08);
+      overflow: hidden;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+    }
+
+    .wa-header {
+      background: #1f2c34;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .wa-avatar {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #25d366, #128c7e);
+      display: grid;
+      place-items: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    .wa-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #e9edef;
+    }
+
+    .wa-status {
+      font-size: 0.72rem;
+      color: #25d366;
+      margin-top: 1px;
+    }
+
+    .wa-body {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #0b141a;
+    }
+
+    .wa-date {
+      text-align: center;
+      font-size: 0.7rem;
+      color: #8696a0;
+      background: rgba(134,150,160,0.1);
+      border-radius: 100px;
+      padding: 3px 10px;
+      width: fit-content;
+      margin: 4px auto;
+    }
+
+    .wa-msg {
+      max-width: 84%;
+      padding: 9px 13px;
+      border-radius: 10px;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: #e9edef;
+    }
+
+    .wa-msg-out {
+      background: #005c4b;
+      align-self: flex-end;
+      border-bottom-right-radius: 3px;
+    }
+
+    .wa-msg-in {
+      background: #1f2c34;
+      align-self: flex-start;
+      border-bottom-left-radius: 3px;
+    }
+
+    .wa-msg-in strong {
+      display: block;
+      font-size: 0.72rem;
+      color: #25d366;
+      margin-bottom: 3px;
+    }
+
+    .wa-meta {
+      font-size: 0.65rem;
+      color: #8696a0;
+      text-align: right;
+      margin-top: 3px;
+    }
+
+    .wa-msg-out .wa-meta { color: #8696a0; }
+
+    .automation-use-cases {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 36px;
+    }
+
+    .use-case {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 18px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .use-case:hover {
+      border-color: rgba(108,99,255,0.3);
+      background: var(--surface);
+    }
+
+    .use-case-icon { font-size: 1.3rem; margin-bottom: 8px; }
+
+    .use-case h4 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .use-case p {
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    @media (max-width: 768px) {
+      .automation-grid { grid-template-columns: 1fr; gap: 40px; }
+      .automation-use-cases { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* ── FAQ ── */
+    #faq { background: var(--bg2); }
+
+    .faq-list {
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .faq-item {
+      background: var(--bg2);
+    }
+
+    .faq-q {
+      width: 100%;
+      text-align: left;
+      padding: 22px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+
+    .faq-q:hover { background: var(--surface); }
+
+    .faq-icon {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      font-size: 1rem;
+      color: var(--muted);
+      flex-shrink: 0;
+      transition: all 0.25s;
+    }
+
+    .faq-item.open .faq-icon {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      transform: rotate(45deg);
+    }
+
+    .faq-a {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, padding 0.3s;
+    }
+
+    .faq-item.open .faq-a { max-height: 300px; }
+
+    .faq-a-inner {
+      padding: 0 28px 22px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* ── CONTACT ── */
+    #contact {
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #contact::before {
+      content: '';
+      position: absolute;
+      bottom: -100px;
+      right: -100px;
+      width: 500px; height: 500px;
+      background: radial-gradient(ellipse, rgba(108,99,255,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: start;
+    }
+
+    .contact-info h2 { margin-bottom: 16px; }
+
+    .contact-bullets {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 36px;
+    }
+
+    .contact-bullet {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .contact-bullet-icon {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .contact-bullet-text strong {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .contact-bullet-text span {
+      font-size: 0.83rem;
+      color: var(--muted);
+    }
+
+    .contact-form {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--muted);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      padding: 12px 16px;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+
+    .form-group select option { background: var(--surface); }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .form-group textarea { resize: vertical; min-height: 110px; }
+
+    .form-submit {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .success-msg {
+      display: none;
+      text-align: center;
+      padding: 20px;
+      font-size: 0.95rem;
+      color: var(--green);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      padding: 48px 5% 32px;
+    }
+
+    .footer-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 40px;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+
+    .footer-brand p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      max-width: 280px;
+      margin-top: 12px;
+      line-height: 1.65;
+    }
+
+    .footer-links h4 {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted2);
+      margin-bottom: 16px;
+    }
+
+    .footer-links ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .footer-links a {
+      font-size: 0.88rem;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover { color: var(--text); }
+
+    .footer-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-top: 1px solid var(--border);
+      padding-top: 28px;
+    }
+
+    .footer-bottom p {
+      font-size: 0.82rem;
+      color: var(--muted2);
+    }
+
+    /* ── SCROLL ANIMATIONS ── */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .fade-up.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-links.open {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: 68px; left: 0; right: 0;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+        padding: 24px 5%;
+        gap: 20px;
+      }
+      .nav-cta { display: block; text-align: center; }
+      .hamburger { display: flex; }
+
+      .hero-stats { flex-direction: column; gap: 20px; }
+
+      .contact-grid { grid-template-columns: 1fr; gap: 40px; }
+      .form-row { grid-template-columns: 1fr; }
+
+      .result-metrics { grid-template-columns: 1fr 1fr; }
+
+      .step:not(:last-child)::after { display: none; }
+
+      section { padding: 64px 5%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="#" class="logo">
+      <img src="logo.png" alt="High Street Collective" class="logo-icon" />
+      High Street Collective
+    </a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#services">Services</a></li>
+      <li><a href="#automation">Smart Updates</a></li>
+      <li><a href="#results">Results</a></li>
+      <li><a href="#faq">FAQ</a></li>
+      <li><a href="#contact" class="nav-cta">Get Started</a></li>
+    </ul>
+    <div class="hamburger" id="hamburger" onclick="toggleNav()">
+      <span></span><span></span><span></span>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero" id="home">
+    <div class="hero-bg"></div>
+    <div class="grid-overlay"></div>
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        All-in-One Digital Growth Partner
+      </div>
+      <h1>
+        Your business deserves<br>
+        to be found <span class="grad">online.</span>
+      </h1>
+      <p class="hero-sub">
+        We handle your website, AI phone answering, Google presence, social media, ads, and booking — so you can focus on running your business.
+      </p>
+      <div class="hero-actions">
+        <a href="#contact" class="btn-primary">
+          Get a Free Strategy Call
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <a href="#results" class="btn-ghost">
+          See Real Results
+        </a>
+      </div>
+      <div class="hero-stats">
+        <div>
+          <div class="hero-stat-num">150+</div>
+          <div class="hero-stat-label">Local businesses helped</div>
+        </div>
+        <div>
+          <div class="hero-stat-num">3.8×</div>
+          <div class="hero-stat-label">Average lead increase</div>
+        </div>
+        <div>
+          <div class="hero-stat-num">48hr</div>
+          <div class="hero-stat-label">Typical onboarding time</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TICKER -->
+  <div class="ticker-wrap">
+    <div class="ticker-track">
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Website Design & Development</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> AI Voice Customer Service</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Google Business Profile</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Local SEO</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> WhatsApp Website Updates</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Social Media Management</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Paid Ads</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Online Booking Systems</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Website Design & Development</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> AI Voice Customer Service</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Google Business Profile</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Local SEO</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> WhatsApp Website Updates</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Social Media Management</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Paid Ads</span>
+      <span class="ticker-item"><span class="ticker-dot">✦</span> Online Booking Systems</span>
+    </div>
+  </div>
+
+  <!-- SERVICES -->
+  <section id="services">
+    <div class="section-header fade-up">
+      <span class="section-eyebrow">What We Do</span>
+      <h2>Everything your business needs.<br>Nothing it doesn't.</h2>
+      <p class="section-sub">We only offer services that move the needle for local businesses. No bloat, no jargon — just results.</p>
+    </div>
+    <div class="services-grid">
+      <div class="service-card fade-up">
+        <div class="service-icon" style="background: rgba(108,99,255,0.12);">🌐</div>
+        <h3>Website Design & Build</h3>
+        <p>A fast, mobile-friendly website that looks great and turns visitors into customers. We handle design, copy, and launch — all done for you.</p>
+        <span class="service-tag">Most popular</span>
+      </div>
+      <div class="service-card fade-up">
+        <div class="service-icon" style="background: rgba(56,189,248,0.12);">🤖</div>
+        <h3>AI Voice Receptionist</h3>
+        <p>Never miss a call again. Our AI answers your phones 24/7, books appointments, answers questions, and handles basic inquiries — just like a real receptionist.</p>
+        <span class="service-tag">New</span>
+      </div>
+      <div class="service-card fade-up">
+        <div class="service-icon" style="background: rgba(52,211,153,0.12);">🔍</div>
+        <h3>Local SEO</h3>
+        <p>Show up when people in your area search for what you offer. We optimize your site so Google sends customers to you — not your competitors.</p>
+      </div>
+      <div class="service-card fade-up">
+        <div class="service-icon" style="background: rgba(251,191,36,0.12);">📍</div>
+        <h3>Google Business Profile</h3>
+        <p>Your Google listing is often the first thing people see. We set it up right, keep it updated, and manage your reviews to build trust fast.</p>
+      </div>
+      <div class="service-card fade-up">
+        <div class="service-icon" style="background: rgba(244,114,182,0.12);">📱</div>
+        <h3>Social Media Management</h3>
+        <p>Consistent, on-brand posts that keep you top-of-mind with local customers. We handle content creation, scheduling, and basic engagement.</p>
+      </div>
+      <div class="service-card fade-up">
+        <div class="service-icon" style="background: rgba(167,139,250,0.12);">📅</div>
+        <h3>Booking & Scheduling</h3>
+        <p>Give customers an easy way to book you online — any time, any device. Reduces no-shows with automated reminders and syncs with your calendar.</p>
+      </div>
+      <div class="service-card fade-up" style="grid-column: 1 / -1;">
+        <div class="service-icon" style="background: rgba(251,146,60,0.12);">📣</div>
+        <h3>Paid Ads (Google & Meta)</h3>
+        <p>We run targeted ad campaigns that reach real customers in your area. Every penny is tracked so you know exactly what you're getting back. No guesswork.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how">
+    <div class="section-header fade-up">
+      <span class="section-eyebrow">How It Works</span>
+      <h2>Up and running in days,<br>not months.</h2>
+      <p class="section-sub">We keep it simple. No long commitments to start, and we do the heavy lifting so you don't have to.</p>
+    </div>
+    <div class="steps-wrap fade-up" style="border: 1px solid var(--border); border-radius: var(--radius);">
+      <div class="step">
+        <div class="step-num">01</div>
+        <h3>Free Strategy Call</h3>
+        <p>We learn about your business, your goals, and what's currently holding you back online. No pressure, no obligation.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <h3>We Build Your Plan</h3>
+        <p>We put together a clear, custom action plan — exactly what we'll do and what results you can expect. You approve it.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <h3>We Do the Work</h3>
+        <p>Our team handles everything. You stay in the loop with simple updates, but don't need to lift a finger.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <h3>You Get Results</h3>
+        <p>More calls, more bookings, more visibility. We track it all and report back monthly so you always know what's working.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="results">
+    <div class="section-header fade-up">
+      <span class="section-eyebrow">Client Results</span>
+      <h2>Real numbers from real<br>local businesses.</h2>
+      <p class="section-sub">Business names are kept confidential by request. These are real outcomes from our clients across various industries.</p>
+    </div>
+    <div class="results-grid">
+
+      <!-- Card 1 -->
+      <div class="result-card fade-up">
+        <div class="result-meta">
+          <span class="result-type">Dental Practice · Manchester</span>
+          <span class="result-badge">Active Client</span>
+        </div>
+        <div class="result-metrics">
+          <div class="metric">
+            <div class="metric-val">+214% <span class="metric-arrow">↑</span></div>
+            <div class="metric-label">Google search impressions</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">+87% <span class="metric-arrow">↑</span></div>
+            <div class="metric-label">New patient bookings</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">4.9 ★</div>
+            <div class="metric-label">Google rating (was 3.8)</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">0</div>
+            <div class="metric-label">Missed calls (AI answers 24/7)</div>
+          </div>
+        </div>
+        <p class="result-desc">Before working with us, this practice had an outdated website and was losing calls after hours. We rebuilt their site, deployed an AI receptionist, and cleaned up their Google profile. Within 90 days, new patient intake nearly doubled.</p>
+        <div class="result-services">
+          <span class="result-service">Website</span>
+          <span class="result-service">AI Voice</span>
+          <span class="result-service">Google Business</span>
+          <span class="result-service">SEO</span>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="result-card fade-up">
+        <div class="result-meta">
+          <span class="result-type">Auto Repair Shop · Birmingham</span>
+          <span class="result-badge">Active Client</span>
+        </div>
+        <div class="result-metrics">
+          <div class="metric">
+            <div class="metric-val">3.4× <span class="metric-arrow">↑</span></div>
+            <div class="metric-label">Monthly leads from Google</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">£4.80</div>
+            <div class="metric-label">Cost per lead (was £22)</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">+140%</div>
+            <div class="metric-label">Online booking usage</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">62%</div>
+            <div class="metric-label">Reduction in phone time</div>
+          </div>
+        </div>
+        <p class="result-desc">This shop was relying entirely on word of mouth. We launched a targeted Google Ads campaign, set up an online booking system with automated reminders, and optimized their local SEO. The owner reclaimed 10+ hours a week.</p>
+        <div class="result-services">
+          <span class="result-service">Paid Ads</span>
+          <span class="result-service">Booking System</span>
+          <span class="result-service">SEO</span>
+          <span class="result-service">AI Voice</span>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="result-card fade-up">
+        <div class="result-meta">
+          <span class="result-type">Hair Salon · Edinburgh</span>
+          <span class="result-badge">Active Client</span>
+        </div>
+        <div class="result-metrics">
+          <div class="metric">
+            <div class="metric-val">+320%</div>
+            <div class="metric-label">Instagram reach</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">+55%</div>
+            <div class="metric-label">Revenue in 6 months</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">92%</div>
+            <div class="metric-label">Booking fill rate</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">41%</div>
+            <div class="metric-label">Fewer no-shows</div>
+          </div>
+        </div>
+        <p class="result-desc">The salon had a loyal base but couldn't attract new clients. We built a new website, took over their social presence, and rolled out automated booking with SMS reminders. Revenue grew 55% within the first six months.</p>
+        <div class="result-services">
+          <span class="result-service">Website</span>
+          <span class="result-service">Social Media</span>
+          <span class="result-service">Booking</span>
+          <span class="result-service">Google Business</span>
+        </div>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="result-card fade-up">
+        <div class="result-meta">
+          <span class="result-type">Landscaping Company · Bristol</span>
+          <span class="result-badge">Active Client</span>
+        </div>
+        <div class="result-metrics">
+          <div class="metric">
+            <div class="metric-val">#1</div>
+            <div class="metric-label">Local Google ranking</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">+190%</div>
+            <div class="metric-label">Quote requests/month</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">8.2×</div>
+            <div class="metric-label">Return on ad spend</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">24/7</div>
+            <div class="metric-label">Lead capture (was 9–5 only)</div>
+          </div>
+        </div>
+        <p class="result-desc">This landscaping company had no website and was invisible online. We built them a professional site with a quote request form, ran geo-targeted ads, and achieved a #1 local ranking within 4 months. Quote requests nearly tripled.</p>
+        <div class="result-services">
+          <span class="result-service">Website</span>
+          <span class="result-service">Paid Ads</span>
+          <span class="result-service">SEO</span>
+          <span class="result-service">Google Business</span>
+        </div>
+      </div>
+
+      <!-- Card 5 -->
+      <div class="result-card fade-up">
+        <div class="result-meta">
+          <span class="result-type">Physiotherapy Clinic · Leeds</span>
+          <span class="result-badge">Active Client</span>
+        </div>
+        <div class="result-metrics">
+          <div class="metric">
+            <div class="metric-val">+108%</div>
+            <div class="metric-label">New patient referrals</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">4.8 ★</div>
+            <div class="metric-label">Google rating (was 4.1)</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">73%</div>
+            <div class="metric-label">Of bookings now online</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">−65%</div>
+            <div class="metric-label">Admin call volume</div>
+          </div>
+        </div>
+        <p class="result-desc">Their front desk was overwhelmed with scheduling calls. We deployed AI voice handling, connected it to their booking system, and launched a review generation campaign. Staff focus shifted from phones to patients.</p>
+        <div class="result-services">
+          <span class="result-service">AI Voice</span>
+          <span class="result-service">Booking</span>
+          <span class="result-service">Google Business</span>
+          <span class="result-service">SEO</span>
+        </div>
+      </div>
+
+      <!-- Card 6 -->
+      <div class="result-card fade-up">
+        <div class="result-meta">
+          <span class="result-type">Restaurant · London</span>
+          <span class="result-badge">Active Client</span>
+        </div>
+        <div class="result-metrics">
+          <div class="metric">
+            <div class="metric-val">+78%</div>
+            <div class="metric-label">Walk-in traffic</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">12K+</div>
+            <div class="metric-label">Monthly social reach</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">+230%</div>
+            <div class="metric-label">Google Maps views</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">£1.90</div>
+            <div class="metric-label">Cost per ad click (was £6.40)</div>
+          </div>
+        </div>
+        <p class="result-desc">A family restaurant was being outranked by chains online. We overhauled their Google listing, ran social media content campaigns featuring real menu photos, and launched hyper-local ads. Walk-in traffic jumped 78% in three months.</p>
+        <div class="result-services">
+          <span class="result-service">Social Media</span>
+          <span class="result-service">Google Business</span>
+          <span class="result-service">Paid Ads</span>
+          <span class="result-service">Website</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- AUTOMATION -->
+  <section id="automation">
+    <div class="automation-grid">
+      <!-- WhatsApp Mockup -->
+      <div class="whatsapp-mockup fade-up">
+        <div class="wa-header">
+          <div class="wa-avatar">⬡</div>
+          <div>
+            <div class="wa-name">High Street Collective</div>
+            <div class="wa-status">● online</div>
+          </div>
+        </div>
+        <div class="wa-body">
+          <div class="wa-date">Today</div>
+
+          <div class="wa-msg wa-msg-out">
+            Can you change the Sunday carvery to £14.95 please
+            <div class="wa-meta">10:03 ✓✓</div>
+          </div>
+          <div class="wa-msg wa-msg-in">
+            <strong>HSC Updates</strong>
+            ✅ Done! Sunday carvery updated to £14.95 on your menu page. Live now.
+            <div class="wa-meta">10:03</div>
+          </div>
+
+          <div class="wa-msg wa-msg-out">
+            Also add — live Premier League Saturday 3pm, Man Utd vs Arsenal
+            <div class="wa-meta">10:05 ✓✓</div>
+          </div>
+          <div class="wa-msg wa-msg-in">
+            <strong>HSC Updates</strong>
+            ✅ Added to your What's On page: "Live Premier League — Sat 3pm | Man Utd vs Arsenal"
+            <div class="wa-meta">10:05</div>
+          </div>
+
+          <div class="wa-msg wa-msg-out">
+            Put a banner up — 20% off all colour treatments this week
+            <div class="wa-meta">10:08 ✓✓</div>
+          </div>
+          <div class="wa-msg wa-msg-in">
+            <strong>HSC Updates</strong>
+            ✅ Homepage banner is live. Want me to auto-remove it on Sunday evening?
+            <div class="wa-meta">10:08</div>
+          </div>
+
+          <div class="wa-msg wa-msg-out">
+            Yes please 👍
+            <div class="wa-meta">10:09 ✓✓</div>
+          </div>
+          <div class="wa-msg wa-msg-in">
+            <strong>HSC Updates</strong>
+            ✅ Sorted. Banner will auto-remove Sunday at 11pm.
+            <div class="wa-meta">10:09</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info side -->
+      <div class="automation-info fade-up">
+        <span class="section-eyebrow">Smart Website Updates</span>
+        <h2>Update your website<br>over <span class="grad">WhatsApp.</span></h2>
+        <p class="section-sub">No logins. No waiting. Just send us a message and your website updates automatically — in minutes. It's the simplest way to keep your business looking fresh online.</p>
+
+        <div class="automation-use-cases">
+          <div class="use-case">
+            <div class="use-case-icon">🍺</div>
+            <h4>Pubs & Bars</h4>
+            <p>Live sport listings, TV schedules, happy hour times, and weekly events.</p>
+          </div>
+          <div class="use-case">
+            <div class="use-case-icon">🍽️</div>
+            <h4>Restaurants & Cafés</h4>
+            <p>Daily specials, menu price changes, seasonal dishes, and opening hours.</p>
+          </div>
+          <div class="use-case">
+            <div class="use-case-icon">✂️</div>
+            <h4>Salons & Barbers</h4>
+            <p>Service price updates, promotional offers, and staff availability changes.</p>
+          </div>
+          <div class="use-case">
+            <div class="use-case-icon">🔧</div>
+            <h4>Trades & Garages</h4>
+            <p>Labour rates, booking slots, new services added, or holiday closures.</p>
+          </div>
+          <div class="use-case">
+            <div class="use-case-icon">🛍️</div>
+            <h4>Shops & Retailers</h4>
+            <p>Product prices, stock updates, flash sales, and new arrivals.</p>
+          </div>
+          <div class="use-case">
+            <div class="use-case-icon">📅</div>
+            <h4>Any Business</h4>
+            <p>Upcoming events, emergency closures, news, and seasonal promotions.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="section-header fade-up">
+      <span class="section-eyebrow">FAQ</span>
+      <h2>Common questions.</h2>
+    </div>
+    <div class="faq-list fade-up">
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Do I need to be tech-savvy to work with you?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">Not at all. We're used to working with business owners who aren't technical. We handle all the setup, and we explain everything in plain English. You'll never be left wondering what's going on.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          How long until I start seeing results?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">It depends on the service. Paid ads and AI voice can show results within the first week. SEO and Google Business typically take 30–90 days to build momentum. We'll set realistic expectations during your strategy call.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Am I locked into a long-term contract?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">We operate on monthly agreements. We ask for a 3-month minimum on SEO and website projects since results take time to materialize — but there are no 12-month traps. If you're not happy, we work to fix it.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          What does the AI Voice Receptionist actually do?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">It answers your phone calls 24/7 using a natural-sounding AI voice. It can answer common questions about your business (hours, services, pricing), book appointments directly into your calendar, take messages, and transfer urgent calls to you. It sounds professional and never takes a sick day.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Do you work with businesses across the whole of the UK?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">Yes — we work with businesses all across the UK, from London to Edinburgh. Everything we do is handled remotely, so your location doesn't matter. We know the UK market well and tailor our SEO and ad strategies accordingly.</div></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          What if I only need one or two services?
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-a"><div class="faq-a-inner">Our plans are designed to give you the most value bundled together, but we can discuss a custom scope on your strategy call. We'd rather build a solution that actually fits your needs than sell you something you don't need.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section id="contact">
+    <div class="contact-grid">
+      <div class="contact-info fade-up">
+        <span class="section-eyebrow">Let's Talk</span>
+        <h2>Book your free strategy call today.</h2>
+        <p class="section-sub">Tell us about your business and we'll walk you through exactly how we'd help — no pressure, no hard sell.</p>
+        <div class="contact-bullets">
+          <div class="contact-bullet">
+            <div class="contact-bullet-icon">⚡</div>
+            <div class="contact-bullet-text">
+              <strong>Fast Turnaround</strong>
+              <span>Most clients are onboarded within 48 hours of signing.</span>
+            </div>
+          </div>
+          <div class="contact-bullet">
+            <div class="contact-bullet-icon">📊</div>
+            <div class="contact-bullet-text">
+              <strong>Full Transparency</strong>
+              <span>You get a monthly report with plain-English breakdowns.</span>
+            </div>
+          </div>
+          <div class="contact-bullet">
+            <div class="contact-bullet-icon">🤝</div>
+            <div class="contact-bullet-text">
+              <strong>No Pressure</strong>
+              <span>We only take on clients we know we can genuinely help.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="contact-form fade-up">
+        <form id="contactForm" onsubmit="handleSubmit(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label>First Name</label>
+              <input type="text" placeholder="Jane" required />
+            </div>
+            <div class="form-group">
+              <label>Last Name</label>
+              <input type="text" placeholder="Smith" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Business Email</label>
+            <input type="email" placeholder="jane@yourbusiness.com" required />
+          </div>
+          <div class="form-group">
+            <label>Phone Number</label>
+            <input type="tel" placeholder="07700 900000" />
+          </div>
+          <div class="form-group">
+            <label>What type of business do you run?</label>
+            <input type="text" placeholder="e.g. Auto repair shop, dental clinic..." required />
+          </div>
+          <div class="form-group">
+            <label>What's your biggest digital challenge right now?</label>
+            <select required>
+              <option value="" disabled selected>Select one...</option>
+              <option>I don't have a website yet</option>
+              <option>My website is old or not working</option>
+              <option>I'm not showing up on Google</option>
+              <option>I'm missing too many calls</option>
+              <option>I need more leads and customers</option>
+              <option>I need help with social media</option>
+              <option>I need an online booking system</option>
+              <option>Not sure — I need advice</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Anything else you'd like us to know? (optional)</label>
+            <textarea placeholder="Tell us a little more about your situation..."></textarea>
+          </div>
+          <button type="submit" class="btn-primary form-submit">
+            Book My Free Strategy Call
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </form>
+        <div class="success-msg" id="successMsg">
+          ✅ Thanks! We'll reach out within 1 business day to schedule your call.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a href="#" class="logo">
+          <img src="logo.png" alt="High Street Collective" class="logo-icon" />
+          High Street Collective
+        </a>
+        <p>The all-in-one digital partner for UK local businesses that want to grow without the headache.</p>
+      </div>
+      <div class="footer-links">
+        <h4>Services</h4>
+        <ul>
+          <li><a href="#services">Website Design</a></li>
+          <li><a href="#services">AI Voice Receptionist</a></li>
+          <li><a href="#services">Local SEO</a></li>
+          <li><a href="#services">Google Business Profile</a></li>
+          <li><a href="#automation">WhatsApp Automation</a></li>
+          <li><a href="#services">Social Media</a></li>
+          <li><a href="#services">Paid Ads</a></li>
+          <li><a href="#services">Booking & Scheduling</a></li>
+        </ul>
+      </div>
+      <div class="footer-links">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="#automation">Smart Updates</a></li>
+          <li><a href="#results">Client Results</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="#contact">Contact Us</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2025 High Street Collective. All rights reserved.</p>
+      <p>Made for the High Street.</p>
+    </div>
+  </footer>
+
+  <script>
+    // Nav toggle
+    function toggleNav() {
+      document.getElementById('navLinks').classList.toggle('open');
+    }
+
+    // FAQ
+    function toggleFaq(btn) {
+      const item = btn.closest('.faq-item');
+      const isOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+      if (!isOpen) item.classList.add('open');
+    }
+
+    // Form submit
+    function handleSubmit(e) {
+      e.preventDefault();
+      document.getElementById('contactForm').style.display = 'none';
+      document.getElementById('successMsg').style.display = 'block';
+    }
+
+    // Scroll animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.fade-up').forEach((el, i) => {
+      el.style.transitionDelay = `${(i % 4) * 0.08}s`;
+      observer.observe(el);
+    });
+
+    // Smooth nav close on link click (mobile)
+    document.querySelectorAll('.nav-links a').forEach(a => {
+      a.addEventListener('click', () => {
+        document.getElementById('navLinks').classList.remove('open');
+      });
+    });
+
+    // Nav active state on scroll
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(s => {
+        if (window.scrollY >= s.offsetTop - 120) current = s.id;
+      });
+      navLinks.forEach(a => {
+        a.style.color = a.getAttribute('href') === `#${current}` ? 'var(--text)' : '';
+      });
+    });
+  </script>
+
+</body>
+</html>
