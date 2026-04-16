@@ -38,11 +38,7 @@ import {
   NOT_INTERESTED_REASONS,
   PAIN_POINTS,
 } from "@/lib/outcomes";
-import {
-  deleteCall,
-  recordCall,
-  useCallHistory,
-} from "@/lib/call-history";
+import { useCallHistory } from "@/lib/call-history";
 import type { Company } from "@/lib/use-companies";
 import type { Tables } from "@/lib/supabase/types";
 
@@ -81,7 +77,12 @@ export function CompanyPanel({
   onUpdated,
 }: CompanyPanelProps) {
   const { user } = useUser();
-  const callHistory = useCallHistory(company?.id ?? null);
+  const {
+    history: callHistory,
+    loading: callHistoryLoading,
+    log: logCall,
+    remove: removeCall,
+  } = useCallHistory(company?.id ?? null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteInput, setNoteInput] = useState("");
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -360,7 +361,7 @@ export function CompanyPanel({
                 <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
                 <a
                   href={`tel:${company.phone}`}
-                  onClick={() => recordCall(company.id)}
+                  onClick={() => logCall()}
                   className="text-primary hover:underline font-mono"
                 >
                   {company.phone}
@@ -650,7 +651,11 @@ export function CompanyPanel({
               </span>
             </div>
             <div className="flex-1 overflow-y-auto">
-              {callHistory.length === 0 ? (
+              {callHistoryLoading && callHistory.length === 0 ? (
+                <p className="p-3 text-xs text-muted-foreground">
+                  Loading...
+                </p>
+              ) : callHistory.length === 0 ? (
                 <p className="p-3 text-xs text-muted-foreground italic">
                   No phone clicks recorded yet for this company.
                 </p>
@@ -664,25 +669,27 @@ export function CompanyPanel({
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
                         <div className="min-w-0">
-                          <div className="text-xs font-medium leading-tight">
+                          <div className="text-xs font-medium leading-tight truncate">
                             {new Date(c.ts).toLocaleDateString("en-GB", {
                               day: "2-digit",
                               month: "short",
                               year: "2-digit",
-                            })}
+                            })}{" "}
+                            <span className="font-mono text-muted-foreground">
+                              {new Date(c.ts).toLocaleTimeString("en-GB", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
                           </div>
-                          <div className="text-[10px] text-muted-foreground font-mono">
-                            {new Date(c.ts).toLocaleTimeString("en-GB", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                            })}
+                          <div className="text-[10px] text-muted-foreground truncate">
+                            {c.user_name ?? c.user_email ?? "—"}
                           </div>
                         </div>
                       </div>
                       <button
-                        onClick={() => deleteCall(company.id, c.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                        onClick={() => removeCall(c.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0"
                         title="Remove (accidental click)"
                         aria-label="Delete call record"
                       >
@@ -696,7 +703,7 @@ export function CompanyPanel({
             {company.phone && (
               <div className="px-3 py-2 border-t shrink-0">
                 <button
-                  onClick={() => recordCall(company.id)}
+                  onClick={() => logCall()}
                   className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md border bg-card hover:bg-accent transition-colors"
                   title="Log a call attempt for this company"
                 >

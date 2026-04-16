@@ -1,96 +1,87 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import type { Tables } from "@/lib/supabase/types";
 
-export type CallAttempt = {
-  id: string;
-  ts: string; // ISO timestamp
-};
+export type CallAttempt = Tables<"call_attempts">;
 
-type Store = Record<string, CallAttempt[]>;
-
-const KEY = "hsc:callHistory:v1";
-const MAX_PER_COMPANY = 200;
-
-function read(): Store {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Store) : {};
-  } catch {
-    return {};
-  }
-}
-
-function write(store: Store) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(store));
-    // Notify same-tab subscribers (storage event only fires cross-tab)
-    window.dispatchEvent(new CustomEvent("hsc:callHistoryChange"));
-  } catch {
-    // ignore quota
-  }
-}
-
-function randomId() {
-  return (
-    Date.now().toString(36) +
-    Math.random().toString(36).slice(2, 8)
-  );
-}
-
-export function recordCall(companyId: string): CallAttempt {
-  const store = read();
-  const entry: CallAttempt = {
-    id: randomId(),
-    ts: new Date().toISOString(),
-  };
-  const prev = store[companyId] ?? [];
-  store[companyId] = [entry, ...prev].slice(0, MAX_PER_COMPANY);
-  write(store);
-  return entry;
-}
-
-export function deleteCall(companyId: string, attemptId: string) {
-  const store = read();
-  const prev = store[companyId] ?? [];
-  store[companyId] = prev.filter((a) => a.id !== attemptId);
-  if (store[companyId].length === 0) delete store[companyId];
-  write(store);
-}
-
-export function clearHistory(companyId: string) {
-  const store = read();
-  delete store[companyId];
-  write(store);
-}
-
-/** Reactive hook that returns the current company's call history and stays in sync. */
+/**
+ * Reactive hook: fetches this company's call history from the server and
+ * exposes optimistic `log` / `remove` helpers. Durable, team-wide, per-user attributed.
+ */
 export function useCallHistory(companyId: string | null | undefined) {
-  const [history, setHistory] = useState<CallAttempt[]>(() =>
-    companyId ? read()[companyId] ?? [] : []
-  );
+  const [history, setHistory] = useState<CallAttempt[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const refresh = useCallback(() => {
+  const fetchHistory = useCallback(async () => {
     if (!companyId) {
       setHistory([]);
       return;
     }
-    setHistory(read()[companyId] ?? []);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/call-attempts`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { attempts: CallAttempt[] };
+      setHistory(data.attempts);
+    } catch {
+      // silent — surface via toast in the actions instead
+    } finally {
+      setLoading(false);
+    }
   }, [companyId]);
 
   useEffect(() => {
-    refresh();
-    if (typeof window === "undefined") return;
-    const onChange = () => refresh();
-    window.addEventListener("hsc:callHistoryChange", onChange);
-    window.addEventListener("storage", onChange);
-    return () => {
-      window.removeEventListener("hsc:callHistoryChange", onChange);
-      window.removeEventListener("storage", onChange);
-    };
-  }, [refresh]);
+    fetchHistory();
+  }, [fetchHistory]);
 
-  return history;
+  const log = useCallback(async () => {
+    if (!companyId) return;
+    // Optimistic: insert a placeholder immediately, replace on response
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: CallAttempt = {
+      id: tempId,
+      company_id: companyId,
+      user_id: "",
+      user_email: null,
+      user_name: "…",
+      ts: new Date().toISOString(),
+    };
+    setHistory((prev) => [optimistic, ...prev]);
+    try {
+      const res = await fetch(
+        `/api/companies/${companyId}/call-attempts`,
+        { method: "POST" }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const saved = (await res.json()) as CallAttempt;
+      setHistory((prev) => prev.map((a) => (a.id === tempId ? saved : a)));
+    } catch {
+      toast.error("Failed to log call attempt");
+      setHistory((prev) => prev.filter((a) => a.id !== tempId));
+    }
+  }, [companyId]);
+
+  const remove = useCallback(
+    async (attemptId: string) => {
+      if (!companyId) return;
+      // Optimistic remove
+      const prev = history;
+      setHistory((p) => p.filter((a) => a.id !== attemptId));
+      try {
+        const res = await fetch(
+          `/api/companies/${companyId}/call-attempts/${attemptId}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch {
+        toast.error("Failed to delete record");
+        setHistory(prev); // rollback
+      }
+    },
+    [companyId, history]
+  );
+
+  return { history, loading, log, remove };
 }

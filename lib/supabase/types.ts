@@ -12,6 +12,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      call_attempts: {
+        Row: {
+          company_id: string
+          id: string
+          ts: string
+          user_email: string | null
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          company_id: string
+          id?: string
+          ts?: string
+          user_email?: string | null
+          user_id: string
+          user_name?: string | null
+        }
+        Update: {
+          company_id?: string
+          id?: string
+          ts?: string
+          user_email?: string | null
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_attempts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_logs: {
         Row: {
           calendar_event_id: string | null
