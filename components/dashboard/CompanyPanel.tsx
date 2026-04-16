@@ -23,12 +23,14 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   CheckCircle,
   Globe,
+  History,
   Keyboard,
   Loader2,
   Mail,
   MapPin,
   Phone,
   Star,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -36,6 +38,11 @@ import {
   NOT_INTERESTED_REASONS,
   PAIN_POINTS,
 } from "@/lib/outcomes";
+import {
+  deleteCall,
+  recordCall,
+  useCallHistory,
+} from "@/lib/call-history";
 import type { Company } from "@/lib/use-companies";
 import type { Tables } from "@/lib/supabase/types";
 
@@ -74,6 +81,7 @@ export function CompanyPanel({
   onUpdated,
 }: CompanyPanelProps) {
   const { user } = useUser();
+  const callHistory = useCallHistory(company?.id ?? null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteInput, setNoteInput] = useState("");
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -332,8 +340,8 @@ export function CompanyPanel({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="min-w-[520px] sm:min-w-[600px] p-0 overflow-y-auto">
-        <SheetHeader className="px-4 py-3 border-b">
+      <SheetContent className="min-w-[720px] sm:min-w-[880px] lg:min-w-[960px] p-0 flex flex-col">
+        <SheetHeader className="px-4 py-3 border-b shrink-0">
           <SheetTitle className="flex items-center gap-2 text-base">
             <span className="truncate">{company.name}</span>
             {company.verified && (
@@ -342,7 +350,9 @@ export function CompanyPanel({
           </SheetTitle>
         </SheetHeader>
 
-        <div className="px-4 py-4 space-y-5">
+        <div className="flex flex-1 min-h-0">
+          {/* Main details column */}
+          <div className="flex-1 px-4 py-4 space-y-5 overflow-y-auto">
           {/* Contact info */}
           <div className="space-y-2 text-sm">
             {company.phone && (
@@ -350,6 +360,7 @@ export function CompanyPanel({
                 <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
                 <a
                   href={`tel:${company.phone}`}
+                  onClick={() => recordCall(company.id)}
                   className="text-primary hover:underline font-mono"
                 >
                   {company.phone}
@@ -624,6 +635,77 @@ export function CompanyPanel({
               )}
             </div>
           </div>
+          </div>
+          {/* /Main details column */}
+
+          {/* Call history panel */}
+          <aside className="w-[240px] shrink-0 border-l bg-muted/20 flex flex-col">
+            <div className="px-3 py-2.5 border-b shrink-0 flex items-center justify-between">
+              <div className="inline-flex items-center gap-1.5 text-sm font-semibold">
+                <History className="h-3.5 w-3.5" />
+                Call History
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                {callHistory.length}
+              </span>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {callHistory.length === 0 ? (
+                <p className="p-3 text-xs text-muted-foreground italic">
+                  No phone clicks recorded yet for this company.
+                </p>
+              ) : (
+                <ul className="divide-y">
+                  {callHistory.map((c) => (
+                    <li
+                      key={c.id}
+                      className="group flex items-center justify-between gap-2 px-3 py-2 hover:bg-background/60"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium leading-tight">
+                            {new Date(c.ts).toLocaleDateString("en-GB", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "2-digit",
+                            })}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground font-mono">
+                            {new Date(c.ts).toLocaleTimeString("en-GB", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteCall(company.id, c.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                        title="Remove (accidental click)"
+                        aria-label="Delete call record"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {company.phone && (
+              <div className="px-3 py-2 border-t shrink-0">
+                <button
+                  onClick={() => recordCall(company.id)}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md border bg-card hover:bg-accent transition-colors"
+                  title="Log a call attempt for this company"
+                >
+                  <Phone className="h-3 w-3" />
+                  Log call attempt
+                </button>
+              </div>
+            )}
+          </aside>
         </div>
       </SheetContent>
     </Sheet>
