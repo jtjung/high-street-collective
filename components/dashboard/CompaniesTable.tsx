@@ -783,14 +783,9 @@ export function CompaniesTable({
       {/* Desktop: column picker + reset */}
       <div className="hidden md:flex items-center justify-end gap-2">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors"
-            >
-              <Columns3 className="h-3.5 w-3.5" />
-              Columns
-            </button>
+          <DropdownMenuTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
+            <Columns3 className="h-3.5 w-3.5" />
+            Columns
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
             <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
