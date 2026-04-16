@@ -94,6 +94,7 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          area: string | null
           business_status: string | null
           calendar_event_id: string | null
           callback_at: string | null
@@ -137,6 +138,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          area?: string | null
           business_status?: string | null
           calendar_event_id?: string | null
           callback_at?: string | null
@@ -180,6 +182,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          area?: string | null
           business_status?: string | null
           calendar_event_id?: string | null
           callback_at?: string | null

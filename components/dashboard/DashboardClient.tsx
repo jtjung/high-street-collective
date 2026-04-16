@@ -173,23 +173,24 @@ export function DashboardClient() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-base font-semibold tracking-tight">
-              High Street Collective CRM
+      <header className="border-b bg-card px-3 sm:px-4 py-2.5 sm:py-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-sm sm:text-base font-semibold tracking-tight truncate">
+              HSC CRM
             </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {companies.length.toLocaleString()} companies · cached locally
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 truncate">
+              {companies.length.toLocaleString()} companies
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={refresh}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors"
+              className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors"
               title="Refresh from server"
             >
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Refresh</span>
             </button>
             <SyncButton onSyncComplete={refresh} />
             <UserButton />
@@ -198,9 +199,9 @@ export function DashboardClient() {
       </header>
 
       {/* Control bar */}
-      <div className="border-b bg-card/60 px-4 py-2.5">
+      <div className="border-b bg-card/60 px-3 sm:px-4 py-2.5">
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-64 max-w-md">
+          <div className="relative flex-1 min-w-full sm:min-w-64 sm:max-w-md">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
@@ -215,7 +216,7 @@ export function DashboardClient() {
             value={websiteFilter}
             onValueChange={(v) => v && setWebsiteFilter(v)}
           >
-            <SelectTrigger className="h-9 w-40 text-sm">
+            <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-40 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -231,7 +232,7 @@ export function DashboardClient() {
             value={outcomeFilter}
             onValueChange={(v) => v && setOutcomeFilter(v)}
           >
-            <SelectTrigger className="h-9 w-48 text-sm">
+            <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-48 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -244,7 +245,7 @@ export function DashboardClient() {
           </Select>
 
           <Select value={sortValue} onValueChange={(v) => v && setSort(v)}>
-            <SelectTrigger className="h-9 w-52 text-sm">
+            <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-52 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -278,7 +279,7 @@ export function DashboardClient() {
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-2 sm:p-4">
         <CompaniesTable
           companies={companies}
           loading={loading}

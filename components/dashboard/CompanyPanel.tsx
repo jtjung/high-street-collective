@@ -341,7 +341,7 @@ export function CompanyPanel({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="min-w-[720px] sm:min-w-[880px] lg:min-w-[960px] p-0 flex flex-col">
+      <SheetContent className="w-full max-w-full sm:max-w-[540px] md:max-w-[720px] lg:max-w-[960px] lg:min-w-[960px] p-0 flex flex-col">
         <SheetHeader className="px-4 py-3 border-b shrink-0">
           <SheetTitle className="flex items-center gap-2 text-base">
             <span className="truncate">{company.name}</span>
@@ -351,9 +351,9 @@ export function CompanyPanel({
           </SheetTitle>
         </SheetHeader>
 
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-col lg:flex-row flex-1 min-h-0">
           {/* Main details column */}
-          <div className="flex-1 px-4 py-4 space-y-5 overflow-y-auto">
+          <div className="flex-1 px-3 sm:px-4 py-4 space-y-5 overflow-y-auto">
           {/* Contact info */}
           <div className="space-y-2 text-sm">
             {company.phone && (
@@ -446,7 +446,7 @@ export function CompanyPanel({
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               {OUTCOME_OPTIONS.map((opt) => {
                 const Icon = opt.icon;
                 const active = outcomes.includes(opt.value);
@@ -502,7 +502,7 @@ export function CompanyPanel({
           {outcomes.includes("call_back_later") && (
             <div className="border rounded-md p-3 bg-muted/20 space-y-2">
               <Label className="text-sm font-semibold">Schedule callback</Label>
-              <div className="flex items-start gap-2">
+              <div className="flex flex-col sm:flex-row items-start gap-2">
                 <Calendar
                   mode="single"
                   selected={callbackDate}
@@ -564,7 +564,7 @@ export function CompanyPanel({
                 </span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               {PAIN_POINTS.map((pain) => {
                 const active = painPoints.includes(pain.value);
                 return (
@@ -640,7 +640,7 @@ export function CompanyPanel({
           {/* /Main details column */}
 
           {/* Call history panel */}
-          <aside className="w-[240px] shrink-0 border-l bg-muted/20 flex flex-col">
+          <aside className="order-first lg:order-none w-full lg:w-[240px] shrink-0 border-b lg:border-b-0 lg:border-l bg-muted/20 flex flex-col lg:max-h-none max-h-[200px]">
             <div className="px-3 py-2.5 border-b shrink-0 flex items-center justify-between">
               <div className="inline-flex items-center gap-1.5 text-sm font-semibold">
                 <History className="h-3.5 w-3.5" />

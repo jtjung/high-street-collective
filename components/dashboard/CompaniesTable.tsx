@@ -552,7 +552,155 @@ export function CompaniesTable({
 
   return (
     <div className="space-y-3">
-      <div className="border rounded-lg overflow-auto bg-card shadow-sm">
+      {/* Mobile: card list */}
+      <div className="md:hidden space-y-2">
+        {loading && rows.length === 0 ? (
+          <div className="border rounded-lg bg-card p-6 text-center text-sm text-muted-foreground">
+            Loading...
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="border rounded-lg bg-card p-6 text-center text-sm text-muted-foreground">
+            No companies match the current filters.
+          </div>
+        ) : (
+          rows.map((row) => {
+            const c = row.original;
+            const outs = c.outcomes ?? [];
+            return (
+              <div
+                key={row.id}
+                className="border rounded-lg bg-card p-3 shadow-sm active:bg-muted/30"
+              >
+                {/* Top row: postal + outcomes */}
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <div className="flex flex-wrap items-center gap-1">
+                    {c.postal_code && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-mono"
+                      >
+                        {c.postal_code}
+                      </Badge>
+                    )}
+                    {c.verified && (
+                      <Check className="h-3.5 w-3.5 text-green-600" />
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-0.5 justify-end">
+                    {outs.length === 0 ? (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-normal"
+                      >
+                        uncalled
+                      </Badge>
+                    ) : (
+                      outs.slice(0, 2).map((o) => (
+                        <Badge
+                          key={o}
+                          className="text-[10px] px-1 py-0 font-normal"
+                        >
+                          {outcomeLabel(o)}
+                        </Badge>
+                      ))
+                    )}
+                    {outs.length > 2 && (
+                      <span className="text-[10px] text-muted-foreground">
+                        +{outs.length - 2}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Name */}
+                <button
+                  onClick={() => onPhoneClick(c)}
+                  className="block w-full text-left font-medium text-sm mb-1 truncate"
+                >
+                  {c.name}
+                </button>
+
+                {/* Phone + Email row */}
+                <div className="flex items-center gap-3 text-xs mb-1.5">
+                  {c.phone ? (
+                    <a
+                      href={`tel:${c.phone}`}
+                      onClick={(e) => {
+                        if (e.metaKey || e.ctrlKey) return;
+                        e.preventDefault();
+                        onPhoneClick(c);
+                      }}
+                      className="inline-flex items-center gap-1 text-primary font-mono"
+                    >
+                      📞 {c.phone}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground text-[10px]">
+                      No phone
+                    </span>
+                  )}
+                  {c.email && (
+                    <a
+                      href={`mailto:${c.email}`}
+                      className="text-primary truncate flex-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      ✉ {c.email}
+                    </a>
+                  )}
+                </div>
+
+                {/* Address */}
+                {c.address && (
+                  <p className="text-[11px] text-muted-foreground truncate mb-1.5">
+                    {c.address}
+                  </p>
+                )}
+
+                {/* Types */}
+                {c.subtypes && c.subtypes.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-1.5">
+                    {c.subtypes.slice(0, 3).map((s) => (
+                      <button
+                        key={s}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTypeClick(s);
+                        }}
+                      >
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] px-1 py-0 font-normal"
+                        >
+                          {s}
+                        </Badge>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Bottom meta row */}
+                <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground pt-1.5 border-t">
+                  <span>
+                    Last:{" "}
+                    {c.last_reached_out
+                      ? formatDateTime(c.last_reached_out)
+                      : "—"}
+                  </span>
+                  {c.callback_at && (
+                    <span className="font-medium text-foreground">
+                      Callback {formatDate(c.callback_at)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop: full table */}
+      <div className="hidden md:block border rounded-lg overflow-auto bg-card shadow-sm">
         <Table
           style={{
             width: table.getTotalSize(),
@@ -633,18 +781,16 @@ export function CompaniesTable({
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-4 flex-wrap">
           <span>
-            Showing{" "}
-            {filteredCount === 0
-              ? 0
-              : pageIndex * pageSize + 1}
+            {filteredCount === 0 ? 0 : pageIndex * pageSize + 1}
             –{Math.min((pageIndex + 1) * pageSize, filteredCount)} of{" "}
             {filteredCount.toLocaleString()}
           </span>
           <div className="flex items-center gap-2">
-            <span>Rows per page</span>
+            <span className="hidden sm:inline">Rows per page</span>
+            <span className="sm:hidden">Per page</span>
             <Select
               value={String(pageSize)}
               onValueChange={(v) => v && setPageSize(Number(v))}
@@ -662,7 +808,7 @@ export function CompaniesTable({
             </Select>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-end gap-1">
           <span className="mr-2">
             Page {pageIndex + 1} of {Math.max(1, pageCount)}
           </span>
