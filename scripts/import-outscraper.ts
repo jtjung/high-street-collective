@@ -133,7 +133,7 @@ async function main() {
       .map((row) => cleanString(row["postal_code"]))
       .filter((p): p is string => p !== null && p.trim().length > 0);
     const uniquePostcodes = [...new Set(allPostcodes)];
-    const areaMap = new Map<string, string>();
+    const areaMap = new Map<string, PostcodeResult>();
     for (let pi = 0; pi < uniquePostcodes.length; pi += 100) {
       const batch = uniquePostcodes.slice(pi, pi + 100);
       const batchMap = await lookupAreas(batch);
