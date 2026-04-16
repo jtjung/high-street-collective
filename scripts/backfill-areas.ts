@@ -11,6 +11,7 @@
 import { createClient } from "@supabase/supabase-js";
 import * as fs from "fs";
 import * as path from "path";
+import { lookupAreas } from "../lib/postcodes";
 
 const SUPABASE_URL = "https://bddlrsqatgqoznyegpeq.supabase.co";
 
@@ -29,33 +30,6 @@ if (!serviceRoleKey) {
 
 const supabase = createClient(SUPABASE_URL, serviceRoleKey);
 
-interface PostcodeResult {
-  area: string | null;
-  neighborhood: string | null;
-}
-
-async function lookupAreas(postcodes: string[]): Promise<Map<string, PostcodeResult>> {
-  const res = await fetch("https://api.postcodes.io/postcodes", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ postcodes }),
-  });
-
-  if (!res.ok) throw new Error(`postcodes.io error: ${res.status}`);
-
-  const data = await res.json();
-  const map = new Map<string, PostcodeResult>();
-
-  for (const item of data.result ?? []) {
-    if (!item?.result) continue;
-    map.set(item.query.toUpperCase(), {
-      area: item.result.admin_district ?? item.result.admin_county ?? null,
-      neighborhood: item.result.admin_ward ?? null,
-    });
-  }
-
-  return map;
-}
 
 async function main() {
   console.log("Fetching companies with postal_code but no area...");
@@ -84,24 +58,16 @@ async function main() {
 
   console.log(`Found ${companies.length} companies to backfill`);
 
+  const allPostcodes = companies.map((c) => c.postal_code!).filter(Boolean);
+  console.log(`Looking up areas for ${allPostcodes.length} postcodes...`);
+  const areaMap = await lookupAreas(allPostcodes);
+
   let updated = 0;
   let failed = 0;
   const batchSize = 100;
 
   for (let i = 0; i < companies.length; i += batchSize) {
     const batch = companies.slice(i, i + batchSize);
-    const postcodes = batch
-      .map((c) => c.postal_code!)
-      .filter((p) => p.trim().length > 0);
-
-    let areaMap = new Map<string, PostcodeResult>();
-    try {
-      areaMap = await lookupAreas(postcodes);
-    } catch (err) {
-      console.error(`  Lookup failed for batch at offset ${i}:`, err);
-      failed += batch.length;
-      continue;
-    }
 
     for (const company of batch) {
       const result = areaMap.get(company.postal_code!.toUpperCase());
@@ -123,11 +89,6 @@ async function main() {
     process.stdout.write(
       `  Progress: ${Math.min(i + batchSize, companies.length)}/${companies.length} (${updated} updated)\r`
     );
-
-    // Respect postcodes.io rate limit (1 req/sec is safe)
-    if (i + batchSize < companies.length) {
-      await new Promise((r) => setTimeout(r, 1000));
-    }
   }
 
   console.log(`\nDone: ${updated} updated, ${failed} failed`);

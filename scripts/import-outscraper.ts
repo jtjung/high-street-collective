@@ -12,6 +12,7 @@ import * as XLSX from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
 import type { Json } from "../lib/supabase/types";
+import { lookupAreas, type PostcodeResult } from "../lib/postcodes";
 
 const OUTSCRAPER_API_KEY = "NGRkMzVmOTE5Njg1NDQ3Zjk1MzJmOWIwZGNlYTczNWR8ODBhNTc1MGMxOA";
 const SUPABASE_URL = "https://bddlrsqatgqoznyegpeq.supabase.co";
@@ -61,29 +62,6 @@ function parseWorkingHours(value: unknown): Json | null {
   }
 }
 
-interface PostcodeResult {
-  area: string | null;
-  neighborhood: string | null;
-}
-
-async function lookupAreas(postcodes: string[]): Promise<Map<string, PostcodeResult>> {
-  const res = await fetch("https://api.postcodes.io/postcodes", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ postcodes }),
-  });
-  if (!res.ok) return new Map();
-  const data = await res.json();
-  const map = new Map<string, PostcodeResult>();
-  for (const item of data.result ?? []) {
-    if (!item?.result) continue;
-    map.set(item.query.toUpperCase(), {
-      area: item.result.admin_district ?? item.result.admin_county ?? null,
-      neighborhood: item.result.admin_ward ?? null,
-    });
-  }
-  return map;
-}
 
 async function main() {
   console.log("Fetching task list from Outscraper...");
@@ -132,15 +110,8 @@ async function main() {
     const allPostcodes = rows
       .map((row) => cleanString(row["postal_code"]))
       .filter((p): p is string => p !== null && p.trim().length > 0);
-    const uniquePostcodes = [...new Set(allPostcodes)];
-    const areaMap = new Map<string, PostcodeResult>();
-    for (let pi = 0; pi < uniquePostcodes.length; pi += 100) {
-      const batch = uniquePostcodes.slice(pi, pi + 100);
-      const batchMap = await lookupAreas(batch);
-      batchMap.forEach((v, k) => areaMap.set(k, v));
-      if (pi + 100 < uniquePostcodes.length) await new Promise((r) => setTimeout(r, 1000));
-    }
-    console.log(`  Resolved areas for ${areaMap.size}/${uniquePostcodes.length} unique postcodes`);
+    const areaMap = await lookupAreas(allPostcodes);
+    console.log(`  Resolved areas for ${areaMap.size} postcodes`);
 
     const companies = rows
       .map((row) => {
