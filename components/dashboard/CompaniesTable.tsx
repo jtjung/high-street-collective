@@ -1,41 +1,39 @@
 "use client";
 
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
-  GroupingState,
   SortingState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
-  getGroupedRowModel,
   getSortedRowModel,
   useReactTable,
   Column,
   Header,
 } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
-  ArrowDownAZ,
-  ArrowUpDown,
-  ArrowUpZA,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
   Check,
-  ChevronDown,
-  ChevronRight,
   ExternalLink,
-  Group,
-  Ungroup,
-  X,
 } from "lucide-react";
 import { outcomeLabel } from "@/lib/outcomes";
 import type { Company } from "@/lib/use-companies";
 
-const COLUMN_WIDTHS_KEY = "hsc:columnWidths";
-const COLUMN_FILTERS_KEY = "hsc:columnFilters";
-const SORTING_KEY = "hsc:sorting";
-const GROUPING_KEY = "hsc:grouping";
+const COLUMN_WIDTHS_KEY = "hsc:columnWidths:v2";
 
 function useLocalStorageState<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(() => {
@@ -58,99 +56,12 @@ function useLocalStorageState<T>(key: string, initial: T) {
   return [value, setValue] as const;
 }
 
-function ColumnHeader<T>({
-  column,
-  label,
-}: {
-  column: Column<T, unknown>;
-  label: string;
-}) {
-  const sortDir = column.getIsSorted();
-  const canGroup = column.getCanGroup();
-  const isGrouped = column.getIsGrouped();
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="relative flex items-center justify-between gap-1 group">
-      <button
-        type="button"
-        onClick={() => column.toggleSorting()}
-        className="flex items-center gap-1 flex-1 text-left font-medium hover:text-foreground"
-      >
-        {label}
-        {sortDir === "asc" && <ArrowDownAZ className="h-3 w-3" />}
-        {sortDir === "desc" && <ArrowUpZA className="h-3 w-3" />}
-        {!sortDir && (
-          <ArrowUpDown className="h-3 w-3 opacity-0 group-hover:opacity-40" />
-        )}
-      </button>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="opacity-0 group-hover:opacity-100 px-1 rounded hover:bg-accent"
-        aria-label="Column options"
-      >
-        <ChevronDown className="h-3 w-3" />
-      </button>
-      {open && (
-        <div
-          className="absolute right-0 top-6 z-50 min-w-48 bg-popover border rounded-md shadow-md p-2 text-xs font-normal"
-          onMouseLeave={() => setOpen(false)}
-        >
-          <div className="mb-2">
-            <Input
-              placeholder="Filter..."
-              value={(column.getFilterValue() as string) ?? ""}
-              onChange={(e) => column.setFilterValue(e.target.value)}
-              className="h-7 text-xs"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <button
-              type="button"
-              className="flex items-center gap-2 px-2 py-1 text-left rounded hover:bg-accent"
-              onClick={() => {
-                column.toggleSorting(false);
-                setOpen(false);
-              }}
-            >
-              <ArrowDownAZ className="h-3 w-3" /> Sort asc
-            </button>
-            <button
-              type="button"
-              className="flex items-center gap-2 px-2 py-1 text-left rounded hover:bg-accent"
-              onClick={() => {
-                column.toggleSorting(true);
-                setOpen(false);
-              }}
-            >
-              <ArrowUpZA className="h-3 w-3" /> Sort desc
-            </button>
-            {canGroup && (
-              <button
-                type="button"
-                className="flex items-center gap-2 px-2 py-1 text-left rounded hover:bg-accent"
-                onClick={() => {
-                  column.toggleGrouping();
-                  setOpen(false);
-                }}
-              >
-                {isGrouped ? (
-                  <>
-                    <Ungroup className="h-3 w-3" /> Ungroup
-                  </>
-                ) : (
-                  <>
-                    <Group className="h-3 w-3" /> Group by this
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+function SortIcon<T>({ column }: { column: Column<T, unknown> }) {
+  if (!column.getCanSort()) return null;
+  const sorted = column.getIsSorted();
+  if (sorted === "asc") return <ArrowUp className="h-3 w-3 shrink-0" />;
+  if (sorted === "desc") return <ArrowDown className="h-3 w-3 shrink-0" />;
+  return <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-30" />;
 }
 
 function ColumnResizer({ header }: { header: Header<Company, unknown> }) {
@@ -158,7 +69,8 @@ function ColumnResizer({ header }: { header: Header<Company, unknown> }) {
     <div
       onMouseDown={header.getResizeHandler()}
       onTouchStart={header.getResizeHandler()}
-      className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none hover:bg-accent ${
+      onDoubleClick={() => header.column.resetSize()}
+      className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none hover:bg-primary/30 ${
         header.column.getIsResizing() ? "bg-primary" : ""
       }`}
     />
@@ -183,7 +95,7 @@ function SocialBtn({
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
-      className="inline-flex items-center justify-center w-7 h-7 rounded text-[10px] font-semibold hover:opacity-80 transition-opacity"
+      className="inline-flex items-center justify-center w-7 h-7 rounded-md text-[10px] font-semibold hover:opacity-80 transition-opacity"
       style={{ background: bg, color }}
       title={label}
     >
@@ -214,27 +126,24 @@ const formatDateTime = (iso: string | null) => {
 interface CompaniesTableProps {
   companies: Company[];
   loading: boolean;
+  globalFilter: string;
+  columnFilters: ColumnFiltersState;
+  sorting: SortingState;
+  onColumnFiltersChange: (v: ColumnFiltersState) => void;
+  onSortingChange: (v: SortingState) => void;
   onPhoneClick: (company: Company) => void;
-  onMapsClick: (company: Company) => void;
 }
 
 export function CompaniesTable({
   companies,
   loading,
+  globalFilter,
+  columnFilters,
+  sorting,
+  onColumnFiltersChange,
+  onSortingChange,
   onPhoneClick,
-  onMapsClick,
 }: CompaniesTableProps) {
-  const [columnFilters, setColumnFilters] = useLocalStorageState<ColumnFiltersState>(
-    COLUMN_FILTERS_KEY,
-    [{ id: "website", value: "__empty__" }]
-  );
-  const [sorting, setSorting] = useLocalStorageState<SortingState>(SORTING_KEY, [
-    { id: "postal_code", desc: false },
-  ]);
-  const [grouping, setGrouping] = useLocalStorageState<GroupingState>(
-    GROUPING_KEY,
-    []
-  );
   const [columnSizing, setColumnSizing] = useLocalStorageState<
     Record<string, number>
   >(COLUMN_WIDTHS_KEY, {});
@@ -243,18 +152,17 @@ export function CompaniesTable({
     () => [
       {
         accessorKey: "postal_code",
-        header: ({ column }) => <ColumnHeader column={column} label="Postal" />,
+        header: "Postal",
         cell: ({ getValue }) => (
           <span className="font-mono text-xs">
             {(getValue() as string) || "—"}
           </span>
         ),
         size: 90,
-        enableGrouping: true,
       },
       {
         accessorKey: "subtypes",
-        header: ({ column }) => <ColumnHeader column={column} label="Type" />,
+        header: "Type",
         cell: ({ getValue }) => {
           const subs = getValue() as string[] | null;
           if (!subs?.length)
@@ -265,7 +173,7 @@ export function CompaniesTable({
                 <Badge
                   key={s}
                   variant="secondary"
-                  className="text-[10px] px-1 py-0"
+                  className="text-[10px] px-1 py-0 font-normal"
                 >
                   {s}
                 </Badge>
@@ -288,7 +196,7 @@ export function CompaniesTable({
       },
       {
         accessorKey: "name",
-        header: ({ column }) => <ColumnHeader column={column} label="Name" />,
+        header: "Name",
         cell: ({ getValue, row }) => (
           <button
             onClick={() => onPhoneClick(row.original)}
@@ -301,25 +209,18 @@ export function CompaniesTable({
       },
       {
         accessorKey: "verified",
-        header: ({ column }) => <ColumnHeader column={column} label="✓" />,
+        header: "✓",
         cell: ({ getValue }) =>
           getValue() ? (
-            <Check className="h-3 w-3 text-green-600" />
+            <Check className="h-3.5 w-3.5 text-green-600" />
           ) : (
             <span className="text-muted-foreground">—</span>
           ),
-        size: 40,
-        filterFn: (row, id, value) => {
-          const v = row.getValue(id) as boolean | null;
-          const s = String(value).toLowerCase();
-          if (s === "true" || s === "yes" || s === "1") return v === true;
-          if (s === "false" || s === "no" || s === "0") return v === false;
-          return true;
-        },
+        size: 50,
       },
       {
         accessorKey: "phone",
-        header: ({ column }) => <ColumnHeader column={column} label="Phone" />,
+        header: "Phone",
         cell: ({ getValue, row }) => {
           const phone = getValue() as string | null;
           if (!phone) return <span className="text-muted-foreground">—</span>;
@@ -337,11 +238,11 @@ export function CompaniesTable({
             </a>
           );
         },
-        size: 130,
+        size: 140,
       },
       {
         accessorKey: "email",
-        header: ({ column }) => <ColumnHeader column={column} label="Email" />,
+        header: "Email",
         cell: ({ getValue }) => {
           const email = getValue() as string | null;
           if (!email) return <span className="text-muted-foreground">—</span>;
@@ -359,7 +260,7 @@ export function CompaniesTable({
       },
       {
         accessorKey: "website",
-        header: ({ column }) => <ColumnHeader column={column} label="Website" />,
+        header: "Website",
         cell: ({ getValue }) => {
           const site = getValue() as string | null;
           if (!site) return <span className="text-muted-foreground">—</span>;
@@ -378,7 +279,7 @@ export function CompaniesTable({
               className="text-primary hover:underline text-xs inline-flex items-center gap-1"
             >
               {host}
-              <ExternalLink className="h-3 w-3" />
+              <ExternalLink className="h-3 w-3 shrink-0" />
             </a>
           );
         },
@@ -394,25 +295,31 @@ export function CompaniesTable({
       },
       {
         id: "maps",
-        header: ({ column }) => <ColumnHeader column={column} label="Maps" />,
-        cell: ({ row }) =>
-          row.original.location_link ? (
-            <button
-              onClick={() => onMapsClick(row.original)}
-              className="text-primary hover:underline text-xs"
+        accessorKey: "location_link",
+        header: "Maps",
+        cell: ({ getValue }) => {
+          const link = getValue() as string | null;
+          if (!link) return <span className="text-muted-foreground">—</span>;
+          return (
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-primary hover:underline text-xs inline-flex items-center gap-1"
             >
-              View
-            </button>
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          ),
-        size: 60,
+              Open
+              <ExternalLink className="h-3 w-3 shrink-0" />
+            </a>
+          );
+        },
+        size: 70,
         enableSorting: false,
         enableColumnFilter: false,
       },
       {
         accessorKey: "instagram",
-        header: ({ column }) => <ColumnHeader column={column} label="IG" />,
+        header: "IG",
         cell: ({ getValue }) => (
           <SocialBtn
             href={getValue() as string | null}
@@ -426,7 +333,7 @@ export function CompaniesTable({
       },
       {
         accessorKey: "facebook",
-        header: ({ column }) => <ColumnHeader column={column} label="FB" />,
+        header: "FB",
         cell: ({ getValue }) => (
           <SocialBtn
             href={getValue() as string | null}
@@ -440,7 +347,7 @@ export function CompaniesTable({
       },
       {
         accessorKey: "linkedin",
-        header: ({ column }) => <ColumnHeader column={column} label="LI" />,
+        header: "LI",
         cell: ({ getValue }) => (
           <SocialBtn
             href={getValue() as string | null}
@@ -454,7 +361,7 @@ export function CompaniesTable({
       },
       {
         accessorKey: "x_twitter",
-        header: ({ column }) => <ColumnHeader column={column} label="X" />,
+        header: "X",
         cell: ({ getValue }) => (
           <SocialBtn
             href={getValue() as string | null}
@@ -468,7 +375,7 @@ export function CompaniesTable({
       },
       {
         accessorKey: "youtube",
-        header: ({ column }) => <ColumnHeader column={column} label="YT" />,
+        header: "YT",
         cell: ({ getValue }) => (
           <SocialBtn
             href={getValue() as string | null}
@@ -482,7 +389,7 @@ export function CompaniesTable({
       },
       {
         accessorKey: "address",
-        header: ({ column }) => <ColumnHeader column={column} label="Address" />,
+        header: "Address",
         cell: ({ getValue }) => (
           <span
             className="text-xs text-muted-foreground truncate block max-w-full"
@@ -491,45 +398,48 @@ export function CompaniesTable({
             {(getValue() as string) || "—"}
           </span>
         ),
-        size: 200,
+        size: 220,
       },
       {
         accessorKey: "outcomes",
-        header: ({ column }) => (
-          <ColumnHeader column={column} label="Outcomes" />
-        ),
+        header: "Outcomes",
         cell: ({ getValue }) => {
           const outs = (getValue() as string[]) ?? [];
           if (!outs.length)
             return (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge
+                variant="outline"
+                className="text-[10px] font-normal"
+              >
                 uncalled
               </Badge>
             );
           return (
             <div className="flex flex-wrap gap-0.5">
               {outs.map((o) => (
-                <Badge key={o} className="text-[10px] px-1 py-0">
+                <Badge
+                  key={o}
+                  className="text-[10px] px-1 py-0 font-normal"
+                >
                   {outcomeLabel(o)}
                 </Badge>
               ))}
             </div>
           );
         },
-        size: 160,
+        size: 170,
         filterFn: (row, id, value) => {
           const outs = (row.getValue(id) as string[]) ?? [];
+          if (value === "__uncalled__") return outs.length === 0;
+          if (value === "__any__") return outs.length > 0;
           const v = String(value).toLowerCase();
-          if (v === "uncalled") return outs.length === 0;
           return outs.some((o) => outcomeLabel(o).toLowerCase().includes(v));
         },
       },
       {
         id: "last_reached_out",
         accessorKey: "last_reached_out",
-        header: ({ column }) => (
-          <ColumnHeader column={column} label="Last Reached" />
-        ),
+        header: "Last Reached",
         cell: ({ getValue }) => (
           <span className="text-xs text-muted-foreground">
             {formatDateTime(getValue() as string | null)}
@@ -540,9 +450,7 @@ export function CompaniesTable({
       },
       {
         accessorKey: "callback_at",
-        header: ({ column }) => (
-          <ColumnHeader column={column} label="Callback" />
-        ),
+        header: "Callback",
         cell: ({ getValue }) => {
           const d = getValue() as string | null;
           if (!d) return <span className="text-muted-foreground">—</span>;
@@ -552,155 +460,178 @@ export function CompaniesTable({
         sortingFn: "datetime",
       },
     ],
-    [onPhoneClick, onMapsClick]
+    [onPhoneClick]
+  );
+
+  // Global fuzzy filter across name, phone, email, address, postal_code
+  const globalFilterFn = useMemo(
+    () => (row: { original: Company }, _columnId: string, filterValue: string) => {
+      if (!filterValue) return true;
+      const q = filterValue.toLowerCase();
+      const c = row.original;
+      return [
+        c.name,
+        c.phone,
+        c.email,
+        c.address,
+        c.postal_code,
+        c.website,
+      ]
+        .filter(Boolean)
+        .some((s) => String(s).toLowerCase().includes(q));
+    },
+    []
   );
 
   const table = useReactTable({
     data: companies,
     columns,
-    state: { columnFilters, sorting, grouping, columnSizing },
-    onColumnFiltersChange: setColumnFilters,
-    onSortingChange: setSorting,
-    onGroupingChange: setGrouping,
+    state: { columnFilters, sorting, columnSizing, globalFilter },
+    onColumnFiltersChange: (updater) => {
+      const next =
+        typeof updater === "function" ? updater(columnFilters) : updater;
+      onColumnFiltersChange(next);
+    },
+    onSortingChange: (updater) => {
+      const next = typeof updater === "function" ? updater(sorting) : updater;
+      onSortingChange(next);
+    },
     onColumnSizingChange: setColumnSizing,
+    globalFilterFn,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getGroupedRowModel: getGroupedRowModel(),
     columnResizeMode: "onChange",
     enableColumnResizing: true,
   });
 
-  const rowCount = table.getFilteredRowModel().rows.length;
+  const rows = table.getRowModel().rows;
 
-  const clearFilters = useCallback(() => {
-    setColumnFilters([]);
-    setGrouping([]);
-  }, [setColumnFilters, setGrouping]);
+  // Virtualizer
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 36,
+    overscan: 10,
+  });
 
-  const hasActiveFilters = columnFilters.length > 0 || grouping.length > 0;
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom =
+    virtualRows.length > 0
+      ? totalSize - virtualRows[virtualRows.length - 1].end
+      : 0;
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{rowCount} companies</span>
-        <div className="flex items-center gap-2">
-          {grouping.length > 0 && (
-            <span className="inline-flex items-center gap-1">
-              Grouped by:{" "}
-              {grouping.map((g) => (
-                <Badge key={g} variant="secondary" className="text-[10px]">
-                  {g}
-                </Badge>
-              ))}
-            </span>
-          )}
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="inline-flex items-center gap-1 hover:text-foreground"
-            >
-              <X className="h-3 w-3" /> Clear filters & grouping
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="border rounded-md overflow-auto bg-card">
-        <table
-          className="text-sm"
-          style={{ width: table.getTotalSize(), minWidth: "100%" }}
-        >
-          <thead className="bg-muted/40 border-b sticky top-0 z-10">
-            {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id}>
-                {hg.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    className="relative text-left px-2 py-2 text-xs font-medium text-muted-foreground"
-                    style={{ width: header.getSize() }}
-                  >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
+    <div
+      ref={scrollRef}
+      className="border rounded-lg overflow-auto bg-card shadow-sm"
+      style={{ height: "calc(100vh - 180px)" }}
+    >
+      <Table
+        style={{
+          width: table.getTotalSize(),
+          minWidth: "100%",
+          tableLayout: "fixed",
+        }}
+      >
+        <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+          {table.getHeaderGroups().map((hg) => (
+            <TableRow key={hg.id} className="hover:bg-transparent">
+              {hg.headers.map((header) => (
+                <TableHead
+                  key={header.id}
+                  className="relative text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                  style={{ width: header.getSize() }}
+                >
+                  {header.isPlaceholder ? null : (
+                    <button
+                      type="button"
+                      onClick={header.column.getToggleSortingHandler()}
+                      disabled={!header.column.getCanSort()}
+                      className="flex items-center gap-1 w-full text-left hover:text-foreground disabled:cursor-default"
+                    >
+                      <span className="truncate">
+                        {flexRender(
                           header.column.columnDef.header,
                           header.getContext()
                         )}
-                    <ColumnResizer header={header} />
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="text-center py-8 text-muted-foreground"
-                >
-                  Loading...
-                </td>
-              </tr>
-            ) : rowCount === 0 ? (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="text-center py-8 text-muted-foreground"
-                >
-                  No companies match the current filters.
-                </td>
-              </tr>
-            ) : (
-              table.getRowModel().rows.map((row) => {
-                if (row.getIsGrouped()) {
-                  return (
-                    <tr key={row.id} className="bg-muted/20 font-medium">
-                      <td
-                        colSpan={columns.length}
-                        className="px-2 py-1.5 text-xs"
-                      >
-                        <button
-                          onClick={row.getToggleExpandedHandler()}
-                          className="inline-flex items-center gap-1 hover:text-foreground"
-                        >
-                          {row.getIsExpanded() ? (
-                            <ChevronDown className="h-3 w-3" />
-                          ) : (
-                            <ChevronRight className="h-3 w-3" />
-                          )}
-                          {String(row.groupingValue)} ({row.subRows.length})
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                }
+                      </span>
+                      <SortIcon column={header.column} />
+                    </button>
+                  )}
+                  <ColumnResizer header={header} />
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {loading && rows.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={columns.length}
+                className="text-center py-8 text-muted-foreground"
+              >
+                Loading...
+              </TableCell>
+            </TableRow>
+          ) : rows.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={columns.length}
+                className="text-center py-8 text-muted-foreground"
+              >
+                No companies match the current filters.
+              </TableCell>
+            </TableRow>
+          ) : (
+            <>
+              {paddingTop > 0 && (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    style={{ height: paddingTop }}
+                  />
+                </tr>
+              )}
+              {virtualRows.map((virtualRow) => {
+                const row = rows[virtualRow.index];
                 return (
-                  <tr
+                  <TableRow
                     key={row.id}
-                    className="border-b hover:bg-muted/20 transition-colors"
+                    data-index={virtualRow.index}
+                    className="hover:bg-muted/30"
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td
+                      <TableCell
                         key={cell.id}
-                        className="px-2 py-1.5 overflow-hidden"
+                        className="py-1.5 overflow-hidden"
                         style={{ width: cell.column.getSize() }}
                       >
-                        {cell.getIsPlaceholder()
-                          ? null
-                          : flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext()
-                            )}
-                      </td>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+              })}
+              {paddingBottom > 0 && (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    style={{ height: paddingBottom }}
+                  />
+                </tr>
+              )}
+            </>
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
 }

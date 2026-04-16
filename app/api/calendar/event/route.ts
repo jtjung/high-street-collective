@@ -42,6 +42,18 @@ export async function POST(request: Request) {
     }
 
     const accessToken = oauthTokens[0].token;
+    const scopes = oauthTokens[0].scopes ?? [];
+
+    if (!scopes.some((s) => s.includes("calendar"))) {
+      return NextResponse.json(
+        {
+          error:
+            "Google OAuth token is missing the calendar scope. Sign out and sign back in with Google, and approve the calendar permission.",
+          scopesGranted: scopes,
+        },
+        { status: 403 }
+      );
+    }
 
     const oauth2Client = new google.auth.OAuth2();
     oauth2Client.setCredentials({ access_token: accessToken });

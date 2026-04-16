@@ -23,7 +23,6 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   CheckCircle,
-  ExternalLink,
   Globe,
   Loader2,
   Mail,
@@ -48,7 +47,6 @@ interface CompanyPanelProps {
   company: Company | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  viewMode: "details" | "maps";
   onUpdated: (id: string, patch: Partial<Company>) => void;
 }
 
@@ -56,7 +54,6 @@ export function CompanyPanel({
   company,
   open,
   onOpenChange,
-  viewMode,
   onUpdated,
 }: CompanyPanelProps) {
   const { user } = useUser();
@@ -106,10 +103,10 @@ export function CompanyPanel({
   }, []);
 
   useEffect(() => {
-    if (company && open && viewMode === "details") {
+    if (company && open) {
       fetchNotes(company.id);
     }
-  }, [company, open, viewMode, fetchNotes]);
+  }, [company, open, fetchNotes]);
 
   const postNote = async () => {
     if (!company || !noteInput.trim() || postingNote) return;
@@ -224,11 +221,6 @@ export function CompanyPanel({
 
   if (!company) return null;
 
-  const mapsQuery = encodeURIComponent(
-    `${company.name} ${company.address ?? ""}`
-  );
-  const mapsEmbedSrc = `https://maps.google.com/maps?q=${mapsQuery}&output=embed&z=17`;
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="min-w-[480px] sm:min-w-[560px] p-0 overflow-y-auto">
@@ -241,35 +233,7 @@ export function CompanyPanel({
           </SheetTitle>
         </SheetHeader>
 
-        {viewMode === "maps" ? (
-          // --- Maps View ---
-          <div className="flex flex-col h-[calc(100vh-60px)]">
-            <iframe
-              src={mapsEmbedSrc}
-              className="w-full flex-1 border-0"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-            <div className="p-3 border-t bg-muted/30 text-xs space-y-1">
-              <div className="flex items-start gap-2">
-                <MapPin className="h-3 w-3 mt-0.5 text-muted-foreground" />
-                <span>{company.address || "No address"}</span>
-              </div>
-              {company.location_link && (
-                <a
-                  href={company.location_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  Open in Google Maps <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
-            </div>
-          </div>
-        ) : (
-          // --- Details View ---
-          <div className="px-4 py-4 space-y-4">
+        <div className="px-4 py-4 space-y-4">
             {/* Contact info */}
             <div className="space-y-2 text-sm">
               {company.phone && (
@@ -464,8 +428,7 @@ export function CompanyPanel({
                 )}
               </div>
             </div>
-          </div>
-        )}
+        </div>
       </SheetContent>
     </Sheet>
   );
