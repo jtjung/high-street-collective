@@ -10,17 +10,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const {
-    companyName,
-    companyPhone,
-    companyAddress,
-    callbackDatetime,
-    notes,
-  } = await request.json();
+  const { companyName, phone, address, startTime: startTimeStr } =
+    (await request.json()) as {
+      companyName: string;
+      phone?: string | null;
+      address?: string | null;
+      startTime: string;
+    };
 
-  if (!callbackDatetime) {
+  if (!startTimeStr) {
     return NextResponse.json(
-      { error: "callbackDatetime is required" },
+      { error: "startTime is required" },
       { status: 400 }
     );
   }
@@ -48,16 +48,14 @@ export async function POST(request: Request) {
 
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
-    const startTime = new Date(callbackDatetime);
+    const startTime = new Date(startTimeStr);
     const endTime = addMinutes(startTime, 15);
 
     const event = {
       summary: `Callback: ${companyName}`,
       description: [
-        `Phone: ${companyPhone || "N/A"}`,
-        `Address: ${companyAddress || "N/A"}`,
-        "",
-        `Notes: ${notes || "None"}`,
+        `Phone: ${phone || "N/A"}`,
+        `Address: ${address || "N/A"}`,
       ].join("\n"),
       start: {
         dateTime: startTime.toISOString(),

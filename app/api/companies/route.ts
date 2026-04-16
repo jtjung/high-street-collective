@@ -1,46 +1,45 @@
 import { auth } from "@clerk/nextjs/server";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const searchParams = request.nextUrl.searchParams;
-  const status = searchParams.get("status") || "uncalled";
-  const page = parseInt(searchParams.get("page") || "1");
-  const pageSize = parseInt(searchParams.get("pageSize") || "50");
-  const search = searchParams.get("search") || "";
-
   const supabase = getSupabaseAdmin();
 
-  let query = supabase
+  // Fetch all companies (~2600 records, ~1-2MB JSON — fits fine in one response)
+  const { data: companies, error } = await supabase
     .from("companies")
-    .select("*", { count: "exact" })
-    .eq("status", status)
+    .select(
+      "id, name, subtypes, category, phone, email, address, street, city, postal_code, country_code, verified, rating, reviews, location_link, website, instagram, facebook, linkedin, x_twitter, youtube, business_status, outcomes, callback_at, outscraper_place_id"
+    )
     .order("postal_code", { ascending: true })
-    .order("name", { ascending: true })
-    .range((page - 1) * pageSize, page * pageSize - 1);
-
-  if (search) {
-    query = query.or(
-      `name.ilike.%${search}%,postal_code.ilike.%${search}%,phone.ilike.%${search}%`
-    );
-  }
-
-  const { data, error, count } = await query;
+    .order("name", { ascending: true });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({
-    companies: data,
-    total: count,
-    page,
-    pageSize,
-    totalPages: Math.ceil((count || 0) / pageSize),
-  });
+  // Fetch latest note date per company for "last_reached_out" column
+  const { data: latestNotes } = await supabase
+    .from("company_notes")
+    .select("company_id, created_at")
+    .order("created_at", { ascending: false });
+
+  const lastReachedMap = new Map<string, string>();
+  for (const note of latestNotes ?? []) {
+    if (!lastReachedMap.has(note.company_id)) {
+      lastReachedMap.set(note.company_id, note.created_at);
+    }
+  }
+
+  const enriched = (companies ?? []).map((c) => ({
+    ...c,
+    last_reached_out: lastReachedMap.get(c.id) ?? null,
+  }));
+
+  return NextResponse.json({ companies: enriched });
 }
