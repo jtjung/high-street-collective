@@ -38,7 +38,6 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -64,6 +63,8 @@ const COLUMN_VISIBILITY_KEY = "hsc:columnVisibility:v1";
 const PAGE_SIZE_KEY = "hsc:pageSize:v1";
 
 const COLUMN_LABELS: Record<string, string> = {
+  area: "Area",
+  neighborhood: "Neighbourhood",
   postal_code: "Postal",
   subtypes: "Type",
   name: "Name",
@@ -234,6 +235,22 @@ export function CompaniesTable({
 
   const columns = useMemo<ColumnDef<Company>[]>(
     () => [
+      {
+        accessorKey: "area",
+        header: "Area",
+        cell: ({ getValue }) => (
+          <span className="text-xs">{(getValue() as string) || "—"}</span>
+        ),
+        size: 140,
+      },
+      {
+        accessorKey: "neighborhood",
+        header: "Neighbourhood",
+        cell: ({ getValue }) => (
+          <span className="text-xs">{(getValue() as string) || "—"}</span>
+        ),
+        size: 160,
+      },
       {
         accessorKey: "postal_code",
         header: "Postal",
@@ -788,7 +805,9 @@ export function CompaniesTable({
             Columns
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
-            <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+            <div className="px-1.5 py-1 text-xs font-medium text-muted-foreground">
+              Toggle columns
+            </div>
             <DropdownMenuSeparator />
             {table
               .getAllLeafColumns()
