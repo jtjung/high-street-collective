@@ -115,6 +115,7 @@ export type Database = {
           linkedin: string | null
           location_link: string | null
           name: string
+          neighborhood: string | null
           not_interested_reason: string | null
           outcomes: string[]
           outscraper_place_id: string | null
@@ -159,6 +160,7 @@ export type Database = {
           linkedin?: string | null
           location_link?: string | null
           name: string
+          neighborhood?: string | null
           not_interested_reason?: string | null
           outcomes?: string[]
           outscraper_place_id?: string | null
@@ -203,6 +205,7 @@ export type Database = {
           linkedin?: string | null
           location_link?: string | null
           name?: string
+          neighborhood?: string | null
           not_interested_reason?: string | null
           outcomes?: string[]
           outscraper_place_id?: string | null

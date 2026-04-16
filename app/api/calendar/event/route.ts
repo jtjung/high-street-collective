@@ -1,11 +1,12 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import { getAuth } from "@/lib/get-auth";
 import { NextResponse } from "next/server";
 import { google } from "googleapis";
 import { TEAM_MEMBERS } from "@/config/team";
 import { addMinutes } from "date-fns";
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const { userId } = await getAuth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -22,6 +23,13 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "startTime is required" },
       { status: 400 }
+    );
+  }
+
+  if (process.env.AUTH_BYPASS === "true") {
+    return NextResponse.json(
+      { error: "Calendar integration not available in preview mode" },
+      { status: 503 }
     );
   }
 

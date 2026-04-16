@@ -269,8 +269,7 @@ export function CompaniesTable({
             <a
               href={`tel:${phone}`}
               onClick={(e) => {
-                if (e.metaKey || e.ctrlKey) return;
-                e.preventDefault();
+                e.stopPropagation();
                 onPhoneClick(row.original);
               }}
               className="text-primary hover:underline font-mono text-xs"
@@ -625,11 +624,7 @@ export function CompaniesTable({
                   {c.phone ? (
                     <a
                       href={`tel:${c.phone}`}
-                      onClick={(e) => {
-                        if (e.metaKey || e.ctrlKey) return;
-                        e.preventDefault();
-                        onPhoneClick(c);
-                      }}
+                      onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center gap-1 text-primary font-mono"
                     >
                       📞 {c.phone}

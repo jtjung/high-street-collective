@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getAuth } from "@/lib/get-auth";
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 
@@ -6,7 +6,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
+  const { userId } = await getAuth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -46,7 +46,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
+  const { userId } = await getAuth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

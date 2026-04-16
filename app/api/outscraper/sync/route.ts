@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getAuth } from "@/lib/get-auth";
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 import { getTask, downloadTaskFile } from "@/lib/outscraper/client";
@@ -7,7 +7,7 @@ import { parseOutscraperXlsx } from "@/lib/outscraper/parser";
 export const maxDuration = 300;
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const { userId } = await getAuth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

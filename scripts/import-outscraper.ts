@@ -61,6 +61,30 @@ function parseWorkingHours(value: unknown): Json | null {
   }
 }
 
+interface PostcodeResult {
+  area: string | null;
+  neighborhood: string | null;
+}
+
+async function lookupAreas(postcodes: string[]): Promise<Map<string, PostcodeResult>> {
+  const res = await fetch("https://api.postcodes.io/postcodes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ postcodes }),
+  });
+  if (!res.ok) return new Map();
+  const data = await res.json();
+  const map = new Map<string, PostcodeResult>();
+  for (const item of data.result ?? []) {
+    if (!item?.result) continue;
+    map.set(item.query.toUpperCase(), {
+      area: item.result.admin_district ?? item.result.admin_county ?? null,
+      neighborhood: item.result.admin_ward ?? null,
+    });
+  }
+  return map;
+}
+
 async function main() {
   console.log("Fetching task list from Outscraper...");
 
@@ -104,6 +128,20 @@ async function main() {
 
     console.log(`  Parsed ${rows.length} rows from XLSX`);
 
+    // Resolve areas for all postcodes in this task via postcodes.io
+    const allPostcodes = rows
+      .map((row) => cleanString(row["postal_code"]))
+      .filter((p): p is string => p !== null && p.trim().length > 0);
+    const uniquePostcodes = [...new Set(allPostcodes)];
+    const areaMap = new Map<string, string>();
+    for (let pi = 0; pi < uniquePostcodes.length; pi += 100) {
+      const batch = uniquePostcodes.slice(pi, pi + 100);
+      const batchMap = await lookupAreas(batch);
+      batchMap.forEach((v, k) => areaMap.set(k, v));
+      if (pi + 100 < uniquePostcodes.length) await new Promise((r) => setTimeout(r, 1000));
+    }
+    console.log(`  Resolved areas for ${areaMap.size}/${uniquePostcodes.length} unique postcodes`);
+
     const companies = rows
       .map((row) => {
         const name = cleanString(row["name"]);
@@ -111,6 +149,7 @@ async function main() {
         const placeId = cleanString(row["place_id"]);
         if (!placeId) return null;
 
+        const postalCode = cleanString(row["postal_code"]);
         return {
           name,
           subtypes: row["subtypes"]
@@ -125,7 +164,9 @@ async function main() {
           address: cleanString(row["address"]),
           street: cleanString(row["street"]),
           city: cleanString(row["city"]),
-          postal_code: cleanString(row["postal_code"]),
+          postal_code: postalCode,
+          area: (postalCode && areaMap.get(postalCode.toUpperCase())?.area) || null,
+          neighborhood: (postalCode && areaMap.get(postalCode.toUpperCase())?.neighborhood) || null,
           country_code: cleanString(row["country_code"]) || "GB",
           verified: parseBool(row["verified"]),
           rating: parseNumber(row["rating"]),

@@ -1,4 +1,5 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import { getAuth } from "@/lib/get-auth";
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 
@@ -6,7 +7,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
+  const { userId } = await getAuth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -31,7 +32,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
+  const { userId } = await getAuth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -43,12 +44,19 @@ export async function POST(
     return NextResponse.json({ error: "Content required" }, { status: 400 });
   }
 
-  const client = await clerkClient();
-  const user = await client.users.getUser(userId);
-  const email = user.primaryEmailAddress?.emailAddress ?? null;
-  const name = user.firstName
-    ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`
-    : email?.split("@")[0] ?? null;
+  let email: string | null = null;
+  let name: string | null = null;
+  if (process.env.AUTH_BYPASS !== "true") {
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    email = user.primaryEmailAddress?.emailAddress ?? null;
+    name = user.firstName
+      ? `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`
+      : email?.split("@")[0] ?? null;
+  } else {
+    email = "dev@bypass.local";
+    name = "Dev User";
+  }
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
