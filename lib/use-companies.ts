@@ -8,7 +8,7 @@ export type Company = Tables<"companies"> & {
 };
 
 const CACHE_KEY = "hsc:companies";
-const CACHE_VERSION = "v2"; // bumped for pain_points + reason fields
+const CACHE_VERSION = "v3"; // bumped for area + neighborhood fields
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 
 type Cached = {
