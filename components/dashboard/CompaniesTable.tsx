@@ -191,6 +191,8 @@ interface CompaniesTableProps {
   onSortingChange: (v: SortingState) => void;
   onPhoneClick: (company: Company) => void;
   onTypeClick: (type: string) => void;
+  onAreaClick: (area: string) => void;
+  onNeighborhoodClick: (neighborhood: string) => void;
 }
 
 export function CompaniesTable({
@@ -203,6 +205,8 @@ export function CompaniesTable({
   onSortingChange,
   onPhoneClick,
   onTypeClick,
+  onAreaClick,
+  onNeighborhoodClick,
 }: CompaniesTableProps) {
   const [columnSizing, setColumnSizing] = useLocalStorageState<
     Record<string, number>
@@ -238,17 +242,33 @@ export function CompaniesTable({
       {
         accessorKey: "area",
         header: "Area",
-        cell: ({ getValue }) => (
-          <span className="text-xs">{(getValue() as string) || "—"}</span>
-        ),
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          return (
+            <button onClick={(e) => { e.stopPropagation(); onAreaClick(v); }} title={`Filter by "${v}"`}>
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 font-normal cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors">
+                {v}
+              </Badge>
+            </button>
+          );
+        },
         size: 140,
       },
       {
         accessorKey: "neighborhood",
         header: "Neighbourhood",
-        cell: ({ getValue }) => (
-          <span className="text-xs">{(getValue() as string) || "—"}</span>
-        ),
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          return (
+            <button onClick={(e) => { e.stopPropagation(); onNeighborhoodClick(v); }} title={`Filter by "${v}"`}>
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 font-normal cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors">
+                {v}
+              </Badge>
+            </button>
+          );
+        },
         size: 160,
       },
       {

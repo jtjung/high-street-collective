@@ -106,6 +106,26 @@ export function DashboardClient() {
     [setColumnFilters]
   );
 
+  const handleAreaClick = useCallback(
+    (area: string) => {
+      setColumnFilters((prev) => {
+        const rest = prev.filter((f) => f.id !== "area");
+        return [...rest, { id: "area", value: area }];
+      });
+    },
+    [setColumnFilters]
+  );
+
+  const handleNeighborhoodClick = useCallback(
+    (neighborhood: string) => {
+      setColumnFilters((prev) => {
+        const rest = prev.filter((f) => f.id !== "neighborhood");
+        return [...rest, { id: "neighborhood", value: neighborhood }];
+      });
+    },
+    [setColumnFilters]
+  );
+
   // Derive control-bar values from columnFilters/sorting
   const websiteFilter = useMemo(() => {
     const f = columnFilters.find((f) => f.id === "website");
@@ -290,6 +310,8 @@ export function DashboardClient() {
           onSortingChange={setSorting}
           onPhoneClick={handlePhoneClick}
           onTypeClick={handleTypeClick}
+          onAreaClick={handleAreaClick}
+          onNeighborhoodClick={handleNeighborhoodClick}
         />
       </div>
 
