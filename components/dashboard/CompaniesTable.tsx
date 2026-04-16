@@ -4,8 +4,10 @@ import { useMemo, useState, useEffect } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
+  ColumnOrderState,
   PaginationState,
   SortingState,
+  VisibilityState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -32,6 +34,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ArrowDown,
   ArrowUp,
   ChevronLeft,
@@ -40,13 +51,37 @@ import {
   ChevronsRight,
   ChevronsUpDown,
   Check,
+  Columns3,
   ExternalLink,
+  GripVertical,
 } from "lucide-react";
 import { outcomeLabel } from "@/lib/outcomes";
 import type { Company } from "@/lib/use-companies";
 
 const COLUMN_WIDTHS_KEY = "hsc:columnWidths:v2";
+const COLUMN_ORDER_KEY = "hsc:columnOrder:v1";
+const COLUMN_VISIBILITY_KEY = "hsc:columnVisibility:v1";
 const PAGE_SIZE_KEY = "hsc:pageSize:v1";
+
+const COLUMN_LABELS: Record<string, string> = {
+  postal_code: "Postal",
+  subtypes: "Type",
+  name: "Name",
+  verified: "Verified",
+  phone: "Phone",
+  email: "Email",
+  website: "Website",
+  maps: "Maps",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  linkedin: "LinkedIn",
+  x_twitter: "X / Twitter",
+  youtube: "YouTube",
+  address: "Address",
+  outcomes: "Outcomes",
+  last_reached_out: "Last Reached",
+  callback_at: "Callback",
+};
 
 function useLocalStorageState<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(() => {
@@ -78,10 +113,19 @@ function SortIcon<T>({ column }: { column: Column<T, unknown> }) {
 }
 
 function ColumnResizer({ header }: { header: Header<Company, unknown> }) {
+  const handler = header.getResizeHandler();
   return (
     <div
-      onMouseDown={header.getResizeHandler()}
-      onTouchStart={header.getResizeHandler()}
+      draggable={false}
+      onDragStart={(e) => e.preventDefault()}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        handler(e);
+      }}
+      onTouchStart={(e) => {
+        e.stopPropagation();
+        handler(e);
+      }}
       onDoubleClick={() => header.column.resetSize()}
       className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none hover:bg-primary/30 ${
         header.column.getIsResizing() ? "bg-primary" : ""
@@ -162,6 +206,13 @@ export function CompaniesTable({
   const [columnSizing, setColumnSizing] = useLocalStorageState<
     Record<string, number>
   >(COLUMN_WIDTHS_KEY, {});
+  const [columnOrder, setColumnOrder] = useLocalStorageState<ColumnOrderState>(
+    COLUMN_ORDER_KEY,
+    []
+  );
+  const [columnVisibility, setColumnVisibility] =
+    useLocalStorageState<VisibilityState>(COLUMN_VISIBILITY_KEY, {});
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useLocalStorageState<number>(
     PAGE_SIZE_KEY,
     50
@@ -523,7 +574,15 @@ export function CompaniesTable({
   const table = useReactTable({
     data: companies,
     columns,
-    state: { columnFilters, sorting, columnSizing, globalFilter, pagination },
+    state: {
+      columnFilters,
+      sorting,
+      columnSizing,
+      columnOrder,
+      columnVisibility,
+      globalFilter,
+      pagination,
+    },
     onColumnFiltersChange: (updater) => {
       const next =
         typeof updater === "function" ? updater(columnFilters) : updater;
@@ -534,6 +593,8 @@ export function CompaniesTable({
       onSortingChange(next);
     },
     onColumnSizingChange: setColumnSizing,
+    onColumnOrderChange: setColumnOrder,
+    onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,
     globalFilterFn,
     getCoreRowModel: getCoreRowModel(),
@@ -543,6 +604,31 @@ export function CompaniesTable({
     columnResizeMode: "onChange",
     enableColumnResizing: true,
   });
+
+  const allLeafColumnIds = useMemo(
+    () => table.getAllLeafColumns().map((c) => c.id),
+    [table]
+  );
+
+  const handleDrop = (targetId: string) => (e: React.DragEvent) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData("text/column-id");
+    setDragOverId(null);
+    if (!sourceId || sourceId === targetId) return;
+    const base = columnOrder.length ? [...columnOrder] : [...allLeafColumnIds];
+    const from = base.indexOf(sourceId);
+    const to = base.indexOf(targetId);
+    if (from === -1 || to === -1) return;
+    base.splice(from, 1);
+    base.splice(to, 0, sourceId);
+    setColumnOrder(base);
+  };
+
+  const resetColumns = () => {
+    setColumnOrder([]);
+    setColumnVisibility({});
+    setColumnSizing({});
+  };
 
   const rows = table.getRowModel().rows;
   const filteredCount = table.getFilteredRowModel().rows.length;
@@ -694,6 +780,44 @@ export function CompaniesTable({
         )}
       </div>
 
+      {/* Desktop: column picker + reset */}
+      <div className="hidden md:flex items-center justify-end gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors"
+              >
+                <Columns3 className="h-3.5 w-3.5" />
+                Columns
+              </button>
+            }
+          />
+          <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+            <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {table
+              .getAllLeafColumns()
+              .filter((c) => c.getCanHide())
+              .map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column.id}
+                  checked={column.getIsVisible()}
+                  onCheckedChange={(v) => column.toggleVisibility(!!v)}
+                  closeOnClick={false}
+                >
+                  {COLUMN_LABELS[column.id] ?? column.id}
+                </DropdownMenuCheckboxItem>
+              ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={resetColumns}>
+              Reset to defaults
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       {/* Desktop: full table */}
       <div className="hidden md:block border rounded-lg overflow-auto bg-card shadow-sm">
         <Table
@@ -706,31 +830,60 @@ export function CompaniesTable({
           <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id} className="hover:bg-transparent">
-                {hg.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    className="relative text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-                    style={{ width: header.getSize() }}
-                  >
-                    {header.isPlaceholder ? null : (
-                      <button
-                        type="button"
-                        onClick={header.column.getToggleSortingHandler()}
-                        disabled={!header.column.getCanSort()}
-                        className="flex items-center gap-1 w-full text-left hover:text-foreground disabled:cursor-default"
-                      >
-                        <span className="truncate">
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                        </span>
-                        <SortIcon column={header.column} />
-                      </button>
-                    )}
-                    <ColumnResizer header={header} />
-                  </TableHead>
-                ))}
+                {hg.headers.map((header) => {
+                  const isDragOver = dragOverId === header.column.id;
+                  return (
+                    <TableHead
+                      key={header.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData(
+                          "text/column-id",
+                          header.column.id
+                        );
+                      }}
+                      onDragEnter={(e) => {
+                        e.preventDefault();
+                        setDragOverId(header.column.id);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                      }}
+                      onDragLeave={() => setDragOverId(null)}
+                      onDragEnd={() => setDragOverId(null)}
+                      onDrop={handleDrop(header.column.id)}
+                      className={`relative text-xs font-semibold tracking-wide text-muted-foreground uppercase cursor-grab active:cursor-grabbing ${
+                        isDragOver
+                          ? "outline outline-2 outline-primary -outline-offset-2"
+                          : ""
+                      }`}
+                      style={{ width: header.getSize() }}
+                    >
+                      {header.isPlaceholder ? null : (
+                        <div className="flex items-center gap-1 w-full">
+                          <GripVertical className="h-3 w-3 shrink-0 opacity-30" />
+                          <button
+                            type="button"
+                            onClick={header.column.getToggleSortingHandler()}
+                            disabled={!header.column.getCanSort()}
+                            className="flex items-center gap-1 flex-1 min-w-0 text-left hover:text-foreground disabled:cursor-default"
+                          >
+                            <span className="truncate">
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                            </span>
+                            <SortIcon column={header.column} />
+                          </button>
+                        </div>
+                      )}
+                      <ColumnResizer header={header} />
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>
