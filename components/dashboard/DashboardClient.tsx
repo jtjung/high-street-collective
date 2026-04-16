@@ -96,6 +96,16 @@ export function DashboardClient() {
     setPanelOpen(true);
   }, []);
 
+  const handleTypeClick = useCallback(
+    (type: string) => {
+      setColumnFilters((prev) => {
+        const rest = prev.filter((f) => f.id !== "subtypes");
+        return [...rest, { id: "subtypes", value: type }];
+      });
+    },
+    [setColumnFilters]
+  );
+
   // Derive control-bar values from columnFilters/sorting
   const websiteFilter = useMemo(() => {
     const f = columnFilters.find((f) => f.id === "website");
@@ -106,6 +116,15 @@ export function DashboardClient() {
     const f = columnFilters.find((f) => f.id === "outcomes");
     return (f?.value as string) ?? "__all__";
   }, [columnFilters]);
+
+  const typeFilter = useMemo(() => {
+    const f = columnFilters.find((f) => f.id === "subtypes");
+    return f?.value as string | undefined;
+  }, [columnFilters]);
+
+  const clearTypeFilter = useCallback(() => {
+    setColumnFilters((prev) => prev.filter((f) => f.id !== "subtypes"));
+  }, [setColumnFilters]);
 
   const sortValue = useMemo(() => {
     if (sorting.length === 0) return "postal_code:asc";
@@ -237,6 +256,17 @@ export function DashboardClient() {
             </SelectContent>
           </Select>
 
+          {typeFilter && (
+            <button
+              onClick={clearTypeFilter}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:opacity-80"
+              title="Remove type filter"
+            >
+              Type: {typeFilter}
+              <X className="h-3 w-3" />
+            </button>
+          )}
+
           {hasFiltersApplied && (
             <button
               onClick={clearAll}
@@ -258,6 +288,7 @@ export function DashboardClient() {
           onColumnFiltersChange={setColumnFilters}
           onSortingChange={setSorting}
           onPhoneClick={handlePhoneClick}
+          onTypeClick={handleTypeClick}
         />
       </div>
 

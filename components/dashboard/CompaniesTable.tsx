@@ -1,20 +1,28 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
+  PaginationState,
   SortingState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   Column,
   Header,
 } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -26,6 +34,10 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   ChevronsUpDown,
   Check,
   ExternalLink,
@@ -34,6 +46,7 @@ import { outcomeLabel } from "@/lib/outcomes";
 import type { Company } from "@/lib/use-companies";
 
 const COLUMN_WIDTHS_KEY = "hsc:columnWidths:v2";
+const PAGE_SIZE_KEY = "hsc:pageSize:v1";
 
 function useLocalStorageState<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(() => {
@@ -132,6 +145,7 @@ interface CompaniesTableProps {
   onColumnFiltersChange: (v: ColumnFiltersState) => void;
   onSortingChange: (v: SortingState) => void;
   onPhoneClick: (company: Company) => void;
+  onTypeClick: (type: string) => void;
 }
 
 export function CompaniesTable({
@@ -143,10 +157,29 @@ export function CompaniesTable({
   onColumnFiltersChange,
   onSortingChange,
   onPhoneClick,
+  onTypeClick,
 }: CompaniesTableProps) {
   const [columnSizing, setColumnSizing] = useLocalStorageState<
     Record<string, number>
   >(COLUMN_WIDTHS_KEY, {});
+  const [pageSize, setPageSize] = useLocalStorageState<number>(
+    PAGE_SIZE_KEY,
+    50
+  );
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize,
+  });
+
+  // Keep pagination.pageSize in sync with stored setting
+  useEffect(() => {
+    setPagination((p) => ({ ...p, pageSize }));
+  }, [pageSize]);
+
+  // Reset to first page when filters/sort/search change
+  useEffect(() => {
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
+  }, [columnFilters, sorting, globalFilter]);
 
   const columns = useMemo<ColumnDef<Company>[]>(
     () => [
@@ -170,13 +203,21 @@ export function CompaniesTable({
           return (
             <div className="flex flex-wrap gap-0.5">
               {subs.slice(0, 2).map((s) => (
-                <Badge
+                <button
                   key={s}
-                  variant="secondary"
-                  className="text-[10px] px-1 py-0 font-normal"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTypeClick(s);
+                  }}
+                  title={`Filter by "${s}"`}
                 >
-                  {s}
-                </Badge>
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] px-1 py-0 font-normal cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                  >
+                    {s}
+                  </Badge>
+                </button>
               ))}
               {subs.length > 2 && (
                 <span className="text-[10px] text-muted-foreground">
@@ -460,33 +501,30 @@ export function CompaniesTable({
         sortingFn: "datetime",
       },
     ],
-    [onPhoneClick]
+    [onPhoneClick, onTypeClick]
   );
 
-  // Global fuzzy filter across name, phone, email, address, postal_code
   const globalFilterFn = useMemo(
-    () => (row: { original: Company }, _columnId: string, filterValue: string) => {
-      if (!filterValue) return true;
-      const q = filterValue.toLowerCase();
-      const c = row.original;
-      return [
-        c.name,
-        c.phone,
-        c.email,
-        c.address,
-        c.postal_code,
-        c.website,
-      ]
-        .filter(Boolean)
-        .some((s) => String(s).toLowerCase().includes(q));
-    },
+    () =>
+      (
+        row: { original: Company },
+        _columnId: string,
+        filterValue: string
+      ) => {
+        if (!filterValue) return true;
+        const q = filterValue.toLowerCase();
+        const c = row.original;
+        return [c.name, c.phone, c.email, c.address, c.postal_code, c.website]
+          .filter(Boolean)
+          .some((s) => String(s).toLowerCase().includes(q));
+      },
     []
   );
 
   const table = useReactTable({
     data: companies,
     columns,
-    state: { columnFilters, sorting, columnSizing, globalFilter },
+    state: { columnFilters, sorting, columnSizing, globalFilter, pagination },
     onColumnFiltersChange: (updater) => {
       const next =
         typeof updater === "function" ? updater(columnFilters) : updater;
@@ -497,141 +535,171 @@ export function CompaniesTable({
       onSortingChange(next);
     },
     onColumnSizingChange: setColumnSizing,
+    onPaginationChange: setPagination,
     globalFilterFn,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     columnResizeMode: "onChange",
     enableColumnResizing: true,
   });
 
   const rows = table.getRowModel().rows;
-
-  // Virtualizer
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 36,
-    overscan: 10,
-  });
-
-  const virtualRows = rowVirtualizer.getVirtualItems();
-  const totalSize = rowVirtualizer.getTotalSize();
-  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
-  const paddingBottom =
-    virtualRows.length > 0
-      ? totalSize - virtualRows[virtualRows.length - 1].end
-      : 0;
+  const filteredCount = table.getFilteredRowModel().rows.length;
+  const { pageIndex } = pagination;
+  const pageCount = table.getPageCount();
 
   return (
-    <div
-      ref={scrollRef}
-      className="border rounded-lg overflow-auto bg-card shadow-sm"
-      style={{ height: "calc(100vh - 180px)" }}
-    >
-      <Table
-        style={{
-          width: table.getTotalSize(),
-          minWidth: "100%",
-          tableLayout: "fixed",
-        }}
-      >
-        <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-          {table.getHeaderGroups().map((hg) => (
-            <TableRow key={hg.id} className="hover:bg-transparent">
-              {hg.headers.map((header) => (
-                <TableHead
-                  key={header.id}
-                  className="relative text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-                  style={{ width: header.getSize() }}
-                >
-                  {header.isPlaceholder ? null : (
-                    <button
-                      type="button"
-                      onClick={header.column.getToggleSortingHandler()}
-                      disabled={!header.column.getCanSort()}
-                      className="flex items-center gap-1 w-full text-left hover:text-foreground disabled:cursor-default"
-                    >
-                      <span className="truncate">
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                      </span>
-                      <SortIcon column={header.column} />
-                    </button>
-                  )}
-                  <ColumnResizer header={header} />
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {loading && rows.length === 0 ? (
-            <TableRow>
-              <TableCell
-                colSpan={columns.length}
-                className="text-center py-8 text-muted-foreground"
-              >
-                Loading...
-              </TableCell>
-            </TableRow>
-          ) : rows.length === 0 ? (
-            <TableRow>
-              <TableCell
-                colSpan={columns.length}
-                className="text-center py-8 text-muted-foreground"
-              >
-                No companies match the current filters.
-              </TableCell>
-            </TableRow>
-          ) : (
-            <>
-              {paddingTop > 0 && (
-                <tr>
-                  <td
-                    colSpan={columns.length}
-                    style={{ height: paddingTop }}
-                  />
-                </tr>
-              )}
-              {virtualRows.map((virtualRow) => {
-                const row = rows[virtualRow.index];
-                return (
-                  <TableRow
-                    key={row.id}
-                    data-index={virtualRow.index}
-                    className="hover:bg-muted/30"
+    <div className="space-y-3">
+      <div className="border rounded-lg overflow-auto bg-card shadow-sm">
+        <Table
+          style={{
+            width: table.getTotalSize(),
+            minWidth: "100%",
+            tableLayout: "fixed",
+          }}
+        >
+          <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id} className="hover:bg-transparent">
+                {hg.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    className="relative text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                    style={{ width: header.getSize() }}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell
-                        key={cell.id}
-                        className="py-1.5 overflow-hidden"
-                        style={{ width: cell.column.getSize() }}
+                    {header.isPlaceholder ? null : (
+                      <button
+                        type="button"
+                        onClick={header.column.getToggleSortingHandler()}
+                        disabled={!header.column.getCanSort()}
+                        className="flex items-center gap-1 w-full text-left hover:text-foreground disabled:cursor-default"
                       >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                );
-              })}
-              {paddingBottom > 0 && (
-                <tr>
-                  <td
-                    colSpan={columns.length}
-                    style={{ height: paddingBottom }}
-                  />
-                </tr>
-              )}
-            </>
-          )}
-        </TableBody>
-      </Table>
+                        <span className="truncate">
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                        </span>
+                        <SortIcon column={header.column} />
+                      </button>
+                    )}
+                    <ColumnResizer header={header} />
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {loading && rows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="text-center py-8 text-muted-foreground"
+                >
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : rows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="text-center py-8 text-muted-foreground"
+                >
+                  No companies match the current filters.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((row) => (
+                <TableRow key={row.id} className="hover:bg-muted/30">
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell
+                      key={cell.id}
+                      className="py-1.5 overflow-hidden"
+                      style={{ width: cell.column.getSize() }}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center gap-4">
+          <span>
+            Showing{" "}
+            {filteredCount === 0
+              ? 0
+              : pageIndex * pageSize + 1}
+            –{Math.min((pageIndex + 1) * pageSize, filteredCount)} of{" "}
+            {filteredCount.toLocaleString()}
+          </span>
+          <div className="flex items-center gap-2">
+            <span>Rows per page</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(v) => v && setPageSize(Number(v))}
+            >
+              <SelectTrigger className="h-7 w-20 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[25, 50, 100, 200].map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="mr-2">
+            Page {pageIndex + 1} of {Math.max(1, pageCount)}
+          </span>
+          <button
+            onClick={() => table.setPageIndex(0)}
+            disabled={!table.getCanPreviousPage()}
+            className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="First page"
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+            className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+            className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Next page"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => table.setPageIndex(pageCount - 1)}
+            disabled={!table.getCanNextPage()}
+            className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Last page"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

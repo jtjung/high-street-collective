@@ -38,6 +38,8 @@ type CompanyPatch = {
   callback_at?: string | null;
   calendar_event_id?: string | null;
   last_called_at?: string | null;
+  not_interested_reason?: string | null;
+  pain_points?: string[];
 };
 
 export async function PATCH(
@@ -60,6 +62,9 @@ export async function PATCH(
     update.calendar_event_id = body.calendar_event_id;
   if (body.last_called_at !== undefined)
     update.last_called_at = body.last_called_at;
+  if (body.not_interested_reason !== undefined)
+    update.not_interested_reason = body.not_interested_reason;
+  if (body.pain_points !== undefined) update.pain_points = body.pain_points;
 
   const { data, error } = await supabase
     .from("companies")

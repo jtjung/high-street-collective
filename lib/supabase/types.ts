@@ -79,8 +79,10 @@ export type Database = {
           linkedin: string | null
           location_link: string | null
           name: string
+          not_interested_reason: string | null
           outcomes: string[]
           outscraper_place_id: string | null
+          pain_points: string[]
           outscraper_task_id: string | null
           phone: string | null
           phone_carrier_type: string | null
@@ -120,8 +122,10 @@ export type Database = {
           linkedin?: string | null
           location_link?: string | null
           name: string
+          not_interested_reason?: string | null
           outcomes?: string[]
           outscraper_place_id?: string | null
+          pain_points?: string[]
           outscraper_task_id?: string | null
           phone?: string | null
           phone_carrier_type?: string | null
@@ -161,8 +165,10 @@ export type Database = {
           linkedin?: string | null
           location_link?: string | null
           name?: string
+          not_interested_reason?: string | null
           outcomes?: string[]
           outscraper_place_id?: string | null
+          pain_points?: string[]
           outscraper_task_id?: string | null
           phone?: string | null
           phone_carrier_type?: string | null
