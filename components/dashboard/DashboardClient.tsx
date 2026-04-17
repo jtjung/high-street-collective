@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { UserButton } from "@clerk/nextjs";
+import Link from "next/link";
 import type { ColumnFiltersState, SortingState } from "@tanstack/react-table";
 import { CompaniesTable } from "./CompaniesTable";
 import { CompanyPanel } from "./CompanyPanel";
@@ -22,27 +23,27 @@ const FILTERS_KEY = "hsc:columnFilters:v2";
 const SORTING_KEY = "hsc:sorting:v2";
 
 function useLocalState<T>(key: string, initial: T) {
-  const [value, setValue] = useState<T>(() => {
-    if (typeof window === "undefined") return initial;
+  const [value, setValue] = useState<T>(initial);
+
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(key);
-      return raw ? (JSON.parse(raw) as T) : initial;
+      if (raw) setValue(JSON.parse(raw) as T);
     } catch {
-      return initial;
+      // ignore
     }
-  });
+  }, [key]);
+
   const set = useCallback(
     (next: T | ((prev: T) => T)) => {
       setValue((prev) => {
         const nxt = typeof next === "function"
           ? (next as (p: T) => T)(prev)
           : next;
-        if (typeof window !== "undefined") {
-          try {
-            localStorage.setItem(key, JSON.stringify(nxt));
-          } catch {
-            // ignore
-          }
+        try {
+          localStorage.setItem(key, JSON.stringify(nxt));
+        } catch {
+          // ignore
         }
         return nxt;
       });
@@ -83,13 +84,55 @@ export function DashboardClient() {
   const [panelOpen, setPanelOpen] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [columnFilters, setColumnFilters] = useLocalState<ColumnFiltersState>(
+  const [columnFilters, setColumnFiltersRaw] = useLocalState<ColumnFiltersState>(
     FILTERS_KEY,
     [{ id: "website", value: "__empty__" }]
   );
-  const [sorting, setSorting] = useLocalState<SortingState>(SORTING_KEY, [
+  const [sorting, setSortingRaw] = useLocalState<SortingState>(SORTING_KEY, [
     { id: "postal_code", desc: false },
   ]);
+
+  // Undo stack for filter/sort changes
+  const undoStack = useRef<Array<{ columnFilters: ColumnFiltersState; sorting: SortingState }>>([]);
+
+  const setColumnFilters = useCallback(
+    (next: ColumnFiltersState | ((prev: ColumnFiltersState) => ColumnFiltersState)) => {
+      undoStack.current.push({ columnFilters, sorting });
+      if (undoStack.current.length > 50) undoStack.current.shift();
+      setColumnFiltersRaw(next);
+    },
+    [columnFilters, sorting, setColumnFiltersRaw]
+  );
+
+  const setSorting = useCallback(
+    (next: SortingState | ((prev: SortingState) => SortingState)) => {
+      undoStack.current.push({ columnFilters, sorting });
+      if (undoStack.current.length > 50) undoStack.current.shift();
+      setSortingRaw(next);
+    },
+    [columnFilters, sorting, setSortingRaw]
+  );
+
+  // Cmd+Z / Ctrl+Z — undo last filter/sort change (skip when inside an input)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
+      const isMac = /Mac|iPhone|iPad/.test(navigator.platform ?? "");
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod || e.key.toLowerCase() !== "z") return;
+      e.preventDefault();
+      const prev = undoStack.current.pop();
+      if (!prev) return;
+      setColumnFiltersRaw(prev.columnFilters);
+      setSortingRaw(prev.sorting);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [setColumnFiltersRaw, setSortingRaw]);
 
   const handlePhoneClick = useCallback((c: Company) => {
     setSelected(c);
@@ -183,10 +226,12 @@ export function DashboardClient() {
   );
 
   const clearAll = useCallback(() => {
+    undoStack.current.push({ columnFilters, sorting });
+    if (undoStack.current.length > 50) undoStack.current.shift();
     setSearch("");
-    setColumnFilters([]);
-    setSorting([{ id: "postal_code", desc: false }]);
-  }, [setColumnFilters, setSorting]);
+    setColumnFiltersRaw([]);
+    setSortingRaw([{ id: "postal_code", desc: false }]);
+  }, [columnFilters, sorting, setColumnFiltersRaw, setSortingRaw]);
 
   const hasFiltersApplied =
     search.length > 0 || columnFilters.length > 0;
@@ -213,6 +258,12 @@ export function DashboardClient() {
               <span className="hidden sm:inline">Refresh</span>
             </button>
             <SyncButton onSyncComplete={refresh} />
+            <Link
+              href="/goals"
+              className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors"
+            >
+              Goals
+            </Link>
             <UserButton />
           </div>
         </div>
@@ -237,7 +288,9 @@ export function DashboardClient() {
             onValueChange={(v) => v && setWebsiteFilter(v)}
           >
             <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-40 text-sm">
-              <SelectValue />
+              <SelectValue>
+                {WEBSITE_FILTER_OPTIONS.find((o) => o.value === websiteFilter)?.label ?? websiteFilter}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {WEBSITE_FILTER_OPTIONS.map((opt) => (
@@ -253,7 +306,9 @@ export function DashboardClient() {
             onValueChange={(v) => v && setOutcomeFilter(v)}
           >
             <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-48 text-sm">
-              <SelectValue />
+              <SelectValue>
+                {OUTCOME_FILTER_OPTIONS.find((o) => o.value === outcomeFilter)?.label ?? outcomeFilter}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {OUTCOME_FILTER_OPTIONS.map((opt) => (
@@ -266,7 +321,9 @@ export function DashboardClient() {
 
           <Select value={sortValue} onValueChange={(v) => v && setSort(v)}>
             <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-52 text-sm">
-              <SelectValue />
+              <SelectValue>
+                {SORT_OPTIONS.find((o) => o.value === sortValue)?.label ?? sortValue}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {SORT_OPTIONS.map((opt) => (
