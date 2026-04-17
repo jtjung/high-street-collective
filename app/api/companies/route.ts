@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 
 const COLUMNS =
-  "id, name, subtypes, category, phone, email, address, street, city, postal_code, area, neighborhood, country_code, verified, rating, reviews, location_link, website, instagram, facebook, linkedin, x_twitter, youtube, business_status, outcomes, callback_at, not_interested_reason, pain_points, user_goals, manager_name, owner_name, outscraper_place_id";
+  "id, name, subtypes, category, phone, email, address, street, city, postal_code, area, neighborhood, country_code, verified, rating, reviews, location_link, website, instagram, facebook, linkedin, x_twitter, youtube, business_status, outcomes, callback_at, not_interested_reason, pain_points, user_goals, manager_name, owner_name, outscraper_place_id, latitude, longitude";
 
 const PAGE_SIZE = 1000; // Supabase PostgREST hard cap
 

@@ -7,11 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       call_attempts: {
         Row: {
           company_id: string
@@ -107,13 +127,16 @@ export type Database = {
           employee_count: string | null
           facebook: string | null
           founded_year: number | null
+          geocoded_at: string | null
           id: string
           industry: string | null
           instagram: string | null
           is_chain: boolean | null
           last_called_at: string | null
+          latitude: number | null
           linkedin: string | null
           location_link: string | null
+          longitude: number | null
           manager_name: string | null
           name: string
           neighborhood: string | null
@@ -155,13 +178,16 @@ export type Database = {
           employee_count?: string | null
           facebook?: string | null
           founded_year?: number | null
+          geocoded_at?: string | null
           id?: string
           industry?: string | null
           instagram?: string | null
           is_chain?: boolean | null
           last_called_at?: string | null
+          latitude?: number | null
           linkedin?: string | null
           location_link?: string | null
+          longitude?: number | null
           manager_name?: string | null
           name: string
           neighborhood?: string | null
@@ -203,13 +229,16 @@ export type Database = {
           employee_count?: string | null
           facebook?: string | null
           founded_year?: number | null
+          geocoded_at?: string | null
           id?: string
           industry?: string | null
           instagram?: string | null
           is_chain?: boolean | null
           last_called_at?: string | null
+          latitude?: number | null
           linkedin?: string | null
           location_link?: string | null
+          longitude?: number | null
           manager_name?: string | null
           name?: string
           neighborhood?: string | null
@@ -279,75 +308,57 @@ export type Database = {
           },
         ]
       }
-      app_settings: {
-        Row: {
-          key: string
-          value: Json
-          updated_at: string
-        }
-        Insert: {
-          key: string
-          value: Json
-          updated_at?: string
-        }
-        Update: {
-          key?: string
-          value?: Json
-          updated_at?: string
-        }
-        Relationships: []
-      }
       opportunities: {
         Row: {
-          id: string
+          churned_at: string | null
           company_id: string
-          status: string
+          created_at: string
+          discovery_calendar_event_id: string | null
+          discovery_meeting_at: string | null
+          discovery_meeting_contact: string | null
+          follow_up_date: string | null
+          id: string
+          pilot_end_date: string | null
+          pilot_start_date: string | null
           sample_website: string | null
           sent_date: string | null
-          follow_up_date: string | null
-          discovery_meeting_contact: string | null
-          discovery_meeting_at: string | null
-          discovery_calendar_event_id: string | null
-          pilot_start_date: string | null
-          pilot_end_date: string | null
-          won_at: string | null
-          churned_at: string | null
-          created_at: string
+          status: string
           updated_at: string
+          won_at: string | null
         }
         Insert: {
-          id?: string
+          churned_at?: string | null
           company_id: string
-          status?: string
+          created_at?: string
+          discovery_calendar_event_id?: string | null
+          discovery_meeting_at?: string | null
+          discovery_meeting_contact?: string | null
+          follow_up_date?: string | null
+          id?: string
+          pilot_end_date?: string | null
+          pilot_start_date?: string | null
           sample_website?: string | null
           sent_date?: string | null
-          follow_up_date?: string | null
-          discovery_meeting_contact?: string | null
-          discovery_meeting_at?: string | null
-          discovery_calendar_event_id?: string | null
-          pilot_start_date?: string | null
-          pilot_end_date?: string | null
-          won_at?: string | null
-          churned_at?: string | null
-          created_at?: string
+          status?: string
           updated_at?: string
+          won_at?: string | null
         }
         Update: {
-          id?: string
+          churned_at?: string | null
           company_id?: string
-          status?: string
+          created_at?: string
+          discovery_calendar_event_id?: string | null
+          discovery_meeting_at?: string | null
+          discovery_meeting_contact?: string | null
+          follow_up_date?: string | null
+          id?: string
+          pilot_end_date?: string | null
+          pilot_start_date?: string | null
           sample_website?: string | null
           sent_date?: string | null
-          follow_up_date?: string | null
-          discovery_meeting_contact?: string | null
-          discovery_meeting_at?: string | null
-          discovery_calendar_event_id?: string | null
-          pilot_start_date?: string | null
-          pilot_end_date?: string | null
-          won_at?: string | null
-          churned_at?: string | null
-          created_at?: string
+          status?: string
           updated_at?: string
+          won_at?: string | null
         }
         Relationships: [
           {
@@ -436,13 +447,13 @@ export type Tables<
     : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
         DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-      DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-    ? R
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
     : never
-  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
@@ -462,12 +473,12 @@ export type TablesInsert<
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-      Insert: infer I
-    }
-    ? I
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
     : never
-  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
@@ -487,12 +498,12 @@ export type TablesUpdate<
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-      Update: infer U
-    }
-    ? U
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
     : never
-  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
@@ -508,8 +519,8 @@ export type Enums<
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
@@ -525,8 +536,8 @@ export type CompositeTypes<
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   public: {

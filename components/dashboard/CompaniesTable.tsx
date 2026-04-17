@@ -402,6 +402,14 @@ export function CompaniesTable({
           );
         },
         size: 180,
+        filterFn: (row, id, value) => {
+          const v = row.getValue(id) as string | null;
+          if (value === "__empty__") return !v;
+          if (value === "__nonempty__") return !!v;
+          return v
+            ? v.toLowerCase().includes(String(value).toLowerCase())
+            : false;
+        },
       },
       {
         accessorKey: "website",

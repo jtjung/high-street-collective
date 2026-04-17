@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { UserButton } from "@clerk/nextjs";
 import type { ColumnFiltersState, SortingState } from "@tanstack/react-table";
 import { CompaniesTable } from "./CompaniesTable";
 import { CompanyPanel } from "./CompanyPanel";
 import { SyncButton } from "./SyncButton";
+import { RoutePanel } from "./RoutePanel";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -14,13 +16,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RefreshCw, Search, X } from "lucide-react";
+import { RefreshCw, Search, X, LayoutGrid, Map as MapIcon } from "lucide-react";
 import { useCompanies, type Company } from "@/lib/use-companies";
 import { OUTCOME_OPTIONS } from "@/lib/outcomes";
 import { NavTabs } from "@/components/NavTabs";
+import { applyFilters } from "@/lib/filter-predicate";
+import { toast } from "sonner";
+
+const MapView = dynamic(
+  () => import("./MapView").then((m) => m.MapView),
+  { ssr: false, loading: () => <div className="h-[70vh] rounded-lg border bg-muted animate-pulse" /> }
+);
 
 const FILTERS_KEY = "hsc:columnFilters:v2";
 const SORTING_KEY = "hsc:sorting:v2";
+const VIEW_MODE_KEY = "hsc:viewMode:v1";
 
 function useLocalState<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(initial);
@@ -60,6 +70,12 @@ const WEBSITE_FILTER_OPTIONS = [
   { value: "__nonempty__", label: "Has website" },
 ];
 
+const EMAIL_FILTER_OPTIONS = [
+  { value: "__all__", label: "All emails" },
+  { value: "__empty__", label: "No email" },
+  { value: "__nonempty__", label: "Has email" },
+];
+
 const OUTCOME_FILTER_OPTIONS = [
   { value: "__all__", label: "All companies" },
   { value: "__uncalled__", label: "Uncalled only" },
@@ -91,6 +107,20 @@ export function DashboardClient() {
   const [sorting, setSortingRaw] = useLocalState<SortingState>(SORTING_KEY, [
     { id: "postal_code", desc: false },
   ]);
+  const [viewMode, setViewMode] = useLocalState<"table" | "map">(
+    VIEW_MODE_KEY,
+    "table"
+  );
+
+  // Map view state — not persisted
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [visibleInMap, setVisibleInMap] = useState<string[]>([]);
+  const [orderedIds, setOrderedIds] = useState<string[] | null>(null);
+  const [routeStats, setRouteStats] = useState<{
+    distanceMeters: number;
+    durationSeconds: number;
+  } | null>(null);
+  const [optimizing, setOptimizing] = useState(false);
 
   // Undo stack for filter/sort changes
   const undoStack = useRef<Array<{ columnFilters: ColumnFiltersState; sorting: SortingState }>>([]);
@@ -175,6 +205,11 @@ export function DashboardClient() {
     return (f?.value as string) ?? "__all__";
   }, [columnFilters]);
 
+  const emailFilter = useMemo(() => {
+    const f = columnFilters.find((f) => f.id === "email");
+    return (f?.value as string) ?? "__all__";
+  }, [columnFilters]);
+
   const outcomeFilter = useMemo(() => {
     const f = columnFilters.find((f) => f.id === "outcomes");
     return (f?.value as string) ?? "__all__";
@@ -201,6 +236,17 @@ export function DashboardClient() {
         const rest = prev.filter((f) => f.id !== "website");
         if (value === "__all__") return rest;
         return [...rest, { id: "website", value }];
+      });
+    },
+    [setColumnFilters]
+  );
+
+  const setEmailFilter = useCallback(
+    (value: string) => {
+      setColumnFilters((prev) => {
+        const rest = prev.filter((f) => f.id !== "email");
+        if (value === "__all__") return rest;
+        return [...rest, { id: "email", value }];
       });
     },
     [setColumnFilters]
@@ -235,6 +281,100 @@ export function DashboardClient() {
 
   const hasFiltersApplied =
     search.length > 0 || columnFilters.length > 0;
+
+  // Map view — filtered companies (same predicate as table, applied eagerly)
+  const filteredCompanies = useMemo(
+    () => applyFilters(companies, columnFilters, search),
+    [companies, columnFilters, search]
+  );
+
+  const selectedCompanies = useMemo(
+    () => companies.filter((c) => selectedIds.has(c.id)),
+    [companies, selectedIds]
+  );
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setOrderedIds(null);
+    setRouteStats(null);
+  }, []);
+
+  const selectAllInView = useCallback(() => {
+    if (visibleInMap.length === 0) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of visibleInMap) next.add(id);
+      return next;
+    });
+    setOrderedIds(null);
+    setRouteStats(null);
+  }, [visibleInMap]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setOrderedIds(null);
+    setRouteStats(null);
+  }, []);
+
+  const removeFromSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setOrderedIds(null);
+    setRouteStats(null);
+  }, []);
+
+  const optimizeRoute = useCallback(async () => {
+    const stops = selectedCompanies
+      .filter(
+        (c): c is Company & { latitude: number; longitude: number } =>
+          typeof c.latitude === "number" && typeof c.longitude === "number"
+      )
+      .map((c) => ({
+        id: c.id,
+        latitude: c.latitude,
+        longitude: c.longitude,
+      }));
+    if (stops.length < 2) return;
+    setOptimizing(true);
+    try {
+      const res = await fetch("/api/route/optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stops }),
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+      const body = (await res.json()) as {
+        orderedIds: string[];
+        distanceMeters: number;
+        durationSeconds: number;
+      };
+      setOrderedIds(body.orderedIds);
+      setRouteStats({
+        distanceMeters: body.distanceMeters,
+        durationSeconds: body.durationSeconds,
+      });
+      toast.success(
+        `Route optimized: ${(body.distanceMeters / 1000).toFixed(1)} km`
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to optimize route"
+      );
+    } finally {
+      setOptimizing(false);
+    }
+  }, [selectedCompanies]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -297,6 +437,24 @@ export function DashboardClient() {
           </Select>
 
           <Select
+            value={emailFilter}
+            onValueChange={(v) => v && setEmailFilter(v)}
+          >
+            <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-36 text-sm">
+              <SelectValue>
+                {EMAIL_FILTER_OPTIONS.find((o) => o.value === emailFilter)?.label ?? emailFilter}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {EMAIL_FILTER_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
             value={outcomeFilter}
             onValueChange={(v) => v && setOutcomeFilter(v)}
           >
@@ -348,23 +506,82 @@ export function DashboardClient() {
               <X className="h-3 w-3" /> Clear
             </button>
           )}
+
+          <div className="ml-auto inline-flex items-center border rounded-md p-0.5">
+            <button
+              onClick={() => setViewMode("table")}
+              className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded ${
+                viewMode === "table"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Table view"
+              aria-label="Table view"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Table</span>
+            </button>
+            <button
+              onClick={() => setViewMode("map")}
+              className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded ${
+                viewMode === "map"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Map view"
+              aria-label="Map view"
+            >
+              <MapIcon className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Map</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="p-2 sm:p-4">
-        <CompaniesTable
-          companies={companies}
-          loading={loading}
-          globalFilter={search}
-          columnFilters={columnFilters}
-          sorting={sorting}
-          onColumnFiltersChange={setColumnFilters}
-          onSortingChange={setSorting}
-          onPhoneClick={handlePhoneClick}
-          onTypeClick={handleTypeClick}
-          onAreaClick={handleAreaClick}
-          onNeighborhoodClick={handleNeighborhoodClick}
-        />
+        {viewMode === "table" ? (
+          <CompaniesTable
+            companies={companies}
+            loading={loading}
+            globalFilter={search}
+            columnFilters={columnFilters}
+            sorting={sorting}
+            onColumnFiltersChange={setColumnFilters}
+            onSortingChange={setSorting}
+            onPhoneClick={handlePhoneClick}
+            onTypeClick={handleTypeClick}
+            onAreaClick={handleAreaClick}
+            onNeighborhoodClick={handleNeighborhoodClick}
+          />
+        ) : (
+          <div className="flex flex-col lg:flex-row gap-3">
+            <div className="flex-1 min-w-0">
+              <MapView
+                companies={filteredCompanies}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onCompanyClick={handlePhoneClick}
+                orderedIds={orderedIds}
+                onBoundsChange={setVisibleInMap}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1.5 px-1">
+                Click a pin to open · Shift-click to add/remove from route
+              </p>
+            </div>
+            <RoutePanel
+              allVisibleCount={visibleInMap.length}
+              totalCount={filteredCompanies.length}
+              selected={selectedCompanies}
+              orderedIds={orderedIds}
+              optimizing={optimizing}
+              routeStats={routeStats}
+              onSelectAllInView={selectAllInView}
+              onClearSelection={clearSelection}
+              onRemoveSelected={removeFromSelection}
+              onOptimize={optimizeRoute}
+            />
+          </div>
+        )}
       </div>
 
       <CompanyPanel
