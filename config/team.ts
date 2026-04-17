@@ -1,6 +1,6 @@
 export const TEAM_MEMBERS = [
-  { name: "JJ", email: "jtj0828@gmail.com" },
-  // Add more team members here
+  { name: "JT", email: "jt@highstreetcollective.org" },
+  { name: "Nils", email: "nils@highstreetcollective.org" },
 ] as const;
 
 export const TEAM_EMAILS = TEAM_MEMBERS.map((m) => m.email);

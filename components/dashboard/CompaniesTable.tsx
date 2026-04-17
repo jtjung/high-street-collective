@@ -4,8 +4,10 @@ import { useMemo, useState, useEffect } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
+  ColumnOrderState,
   PaginationState,
   SortingState,
+  VisibilityState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -32,6 +34,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ArrowDown,
   ArrowUp,
   ChevronLeft,
@@ -40,13 +50,56 @@ import {
   ChevronsRight,
   ChevronsUpDown,
   Check,
+  Columns3,
   ExternalLink,
+  GripVertical,
 } from "lucide-react";
-import { outcomeLabel } from "@/lib/outcomes";
+import { outcomeLabel, painPointLabel, userGoalLabel } from "@/lib/outcomes";
 import type { Company } from "@/lib/use-companies";
 
+const OUTCOME_COLORS: Record<string, string> = {
+  send_website: "bg-green-100 text-green-800 border-green-200",
+  not_interested: "bg-red-100 text-red-800 border-red-200",
+  interested: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  dead_number: "bg-gray-100 text-gray-600 border-gray-200",
+  voicemail: "bg-orange-100 text-orange-800 border-orange-200",
+  call_back_later: "bg-orange-100 text-orange-800 border-orange-200",
+};
+
 const COLUMN_WIDTHS_KEY = "hsc:columnWidths:v2";
+const COLUMN_ORDER_KEY = "hsc:columnOrder:v1";
+const COLUMN_VISIBILITY_KEY = "hsc:columnVisibility:v1";
 const PAGE_SIZE_KEY = "hsc:pageSize:v1";
+
+const COLUMN_LABELS: Record<string, string> = {
+  area: "Area",
+  neighborhood: "Neighbourhood",
+  postal_code: "Postal",
+  subtypes: "Type",
+  name: "Name",
+  verified: "Verified",
+  phone: "Phone",
+  email: "Email",
+  website: "Website",
+  maps: "Maps",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  linkedin: "LinkedIn",
+  x_twitter: "X / Twitter",
+  youtube: "YouTube",
+  address: "Address",
+  outcomes: "Outcomes",
+  last_reached_out: "Last Reached",
+  callback_at: "Callback",
+  pain_points: "Pain Points",
+  latest_note_content: "Latest Note",
+  call_count: "Calls",
+  rating: "Rating",
+  reviews: "Reviews",
+  manager_name: "Manager",
+  owner_name: "Owner / Landlord",
+  user_goals: "Goals",
+};
 
 function useLocalStorageState<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(() => {
@@ -78,10 +131,19 @@ function SortIcon<T>({ column }: { column: Column<T, unknown> }) {
 }
 
 function ColumnResizer({ header }: { header: Header<Company, unknown> }) {
+  const handler = header.getResizeHandler();
   return (
     <div
-      onMouseDown={header.getResizeHandler()}
-      onTouchStart={header.getResizeHandler()}
+      draggable={false}
+      onDragStart={(e) => e.preventDefault()}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        handler(e);
+      }}
+      onTouchStart={(e) => {
+        e.stopPropagation();
+        handler(e);
+      }}
       onDoubleClick={() => header.column.resetSize()}
       className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none hover:bg-primary/30 ${
         header.column.getIsResizing() ? "bg-primary" : ""
@@ -146,6 +208,8 @@ interface CompaniesTableProps {
   onSortingChange: (v: SortingState) => void;
   onPhoneClick: (company: Company) => void;
   onTypeClick: (type: string) => void;
+  onAreaClick: (area: string) => void;
+  onNeighborhoodClick: (neighborhood: string) => void;
 }
 
 export function CompaniesTable({
@@ -158,10 +222,19 @@ export function CompaniesTable({
   onSortingChange,
   onPhoneClick,
   onTypeClick,
+  onAreaClick,
+  onNeighborhoodClick,
 }: CompaniesTableProps) {
   const [columnSizing, setColumnSizing] = useLocalStorageState<
     Record<string, number>
   >(COLUMN_WIDTHS_KEY, {});
+  const [columnOrder, setColumnOrder] = useLocalStorageState<ColumnOrderState>(
+    COLUMN_ORDER_KEY,
+    []
+  );
+  const [columnVisibility, setColumnVisibility] =
+    useLocalStorageState<VisibilityState>(COLUMN_VISIBILITY_KEY, {});
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useLocalStorageState<number>(
     PAGE_SIZE_KEY,
     50
@@ -183,6 +256,38 @@ export function CompaniesTable({
 
   const columns = useMemo<ColumnDef<Company>[]>(
     () => [
+      {
+        accessorKey: "area",
+        header: "Area",
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          return (
+            <button onClick={(e) => { e.stopPropagation(); onAreaClick(v); }} title={`Filter by "${v}"`}>
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 font-normal cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors">
+                {v}
+              </Badge>
+            </button>
+          );
+        },
+        size: 140,
+      },
+      {
+        accessorKey: "neighborhood",
+        header: "Neighbourhood",
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          return (
+            <button onClick={(e) => { e.stopPropagation(); onNeighborhoodClick(v); }} title={`Filter by "${v}"`}>
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 font-normal cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors">
+                {v}
+              </Badge>
+            </button>
+          );
+        },
+        size: 160,
+      },
       {
         accessorKey: "postal_code",
         header: "Postal",
@@ -241,7 +346,7 @@ export function CompaniesTable({
         cell: ({ getValue, row }) => (
           <button
             onClick={() => onPhoneClick(row.original)}
-            className="text-left font-medium hover:underline truncate max-w-full"
+            className="text-left font-medium hover:underline truncate max-w-full cursor-pointer"
           >
             {getValue() as string}
           </button>
@@ -269,8 +374,7 @@ export function CompaniesTable({
             <a
               href={`tel:${phone}`}
               onClick={(e) => {
-                if (e.metaKey || e.ctrlKey) return;
-                e.preventDefault();
+                e.stopPropagation();
                 onPhoneClick(row.original);
               }}
               className="text-primary hover:underline font-mono text-xs"
@@ -460,7 +564,7 @@ export function CompaniesTable({
               {outs.map((o) => (
                 <Badge
                   key={o}
-                  className="text-[10px] px-1 py-0 font-normal"
+                  className={`text-[10px] px-1 py-0 font-normal border ${OUTCOME_COLORS[o] ?? ""}`}
                 >
                   {outcomeLabel(o)}
                 </Badge>
@@ -500,6 +604,113 @@ export function CompaniesTable({
         size: 100,
         sortingFn: "datetime",
       },
+      {
+        accessorKey: "pain_points",
+        header: "Pain Points",
+        cell: ({ getValue }) => {
+          const pts = (getValue() as string[] | null) ?? [];
+          if (!pts.length) return <span className="text-muted-foreground">—</span>;
+          return (
+            <div className="flex flex-wrap gap-0.5">
+              {pts.map((p) => (
+                <Badge key={p} variant="secondary" className="text-[10px] px-1 py-0 font-normal">
+                  {painPointLabel(p)}
+                </Badge>
+              ))}
+            </div>
+          );
+        },
+        size: 200,
+        enableSorting: false,
+      },
+      {
+        accessorKey: "latest_note_content",
+        header: "Latest Note",
+        cell: ({ getValue }) => {
+          const note = getValue() as string | null;
+          if (!note) return <span className="text-muted-foreground">—</span>;
+          const truncated = note.length > 60 ? note.slice(0, 60) + "…" : note;
+          return (
+            <span className="text-xs text-muted-foreground truncate block" title={note}>
+              {truncated}
+            </span>
+          );
+        },
+        size: 200,
+        enableSorting: false,
+      },
+      {
+        accessorKey: "call_count",
+        header: "Calls",
+        cell: ({ getValue }) => {
+          const count = (getValue() as number) ?? 0;
+          return <span className="text-xs font-mono">{count || "—"}</span>;
+        },
+        size: 60,
+      },
+      {
+        accessorKey: "rating",
+        header: "Rating",
+        cell: ({ getValue }) => {
+          const r = getValue() as number | null;
+          if (!r) return <span className="text-muted-foreground">—</span>;
+          return (
+            <span className="text-xs font-medium">
+              ★ {r.toFixed(1)}
+            </span>
+          );
+        },
+        size: 70,
+      },
+      {
+        accessorKey: "reviews",
+        header: "Reviews",
+        cell: ({ getValue }) => {
+          const n = getValue() as number | null;
+          if (!n) return <span className="text-muted-foreground">—</span>;
+          return <span className="text-xs">{n.toLocaleString()}</span>;
+        },
+        size: 80,
+      },
+      {
+        accessorKey: "manager_name",
+        header: "Manager",
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          return <span className="text-xs">{v}</span>;
+        },
+        size: 140,
+      },
+      {
+        accessorKey: "owner_name",
+        header: "Owner / Landlord",
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          return <span className="text-xs">{v}</span>;
+        },
+        size: 160,
+      },
+      {
+        accessorKey: "user_goals",
+        header: "Goals",
+        cell: ({ getValue }) => {
+          const goals = (getValue() as string[] | null) ?? [];
+          if (!goals.length) return <span className="text-muted-foreground">—</span>;
+          return (
+            <div className="flex flex-wrap gap-0.5">
+              {goals.map((g) => (
+                <Badge key={g} variant="secondary" className="text-[10px] px-1 py-0 font-normal">
+                  {userGoalLabel(g)}
+                </Badge>
+              ))}
+            </div>
+          );
+        },
+        size: 200,
+        enableSorting: false,
+      },
     ],
     [onPhoneClick, onTypeClick]
   );
@@ -524,7 +735,15 @@ export function CompaniesTable({
   const table = useReactTable({
     data: companies,
     columns,
-    state: { columnFilters, sorting, columnSizing, globalFilter, pagination },
+    state: {
+      columnFilters,
+      sorting,
+      columnSizing,
+      columnOrder,
+      columnVisibility,
+      globalFilter,
+      pagination,
+    },
     onColumnFiltersChange: (updater) => {
       const next =
         typeof updater === "function" ? updater(columnFilters) : updater;
@@ -535,6 +754,8 @@ export function CompaniesTable({
       onSortingChange(next);
     },
     onColumnSizingChange: setColumnSizing,
+    onColumnOrderChange: setColumnOrder,
+    onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,
     globalFilterFn,
     getCoreRowModel: getCoreRowModel(),
@@ -544,6 +765,31 @@ export function CompaniesTable({
     columnResizeMode: "onChange",
     enableColumnResizing: true,
   });
+
+  const allLeafColumnIds = useMemo(
+    () => table.getAllLeafColumns().map((c) => c.id),
+    [table]
+  );
+
+  const handleDrop = (targetId: string) => (e: React.DragEvent) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData("text/column-id");
+    setDragOverId(null);
+    if (!sourceId || sourceId === targetId) return;
+    const base = columnOrder.length ? [...columnOrder] : [...allLeafColumnIds];
+    const from = base.indexOf(sourceId);
+    const to = base.indexOf(targetId);
+    if (from === -1 || to === -1) return;
+    base.splice(from, 1);
+    base.splice(to, 0, sourceId);
+    setColumnOrder(base);
+  };
+
+  const resetColumns = () => {
+    setColumnOrder([]);
+    setColumnVisibility({});
+    setColumnSizing({});
+  };
 
   const rows = table.getRowModel().rows;
   const filteredCount = table.getFilteredRowModel().rows.length;
@@ -598,7 +844,7 @@ export function CompaniesTable({
                       outs.slice(0, 2).map((o) => (
                         <Badge
                           key={o}
-                          className="text-[10px] px-1 py-0 font-normal"
+                          className={`text-[10px] px-1 py-0 font-normal border ${OUTCOME_COLORS[o] ?? ""}`}
                         >
                           {outcomeLabel(o)}
                         </Badge>
@@ -625,11 +871,7 @@ export function CompaniesTable({
                   {c.phone ? (
                     <a
                       href={`tel:${c.phone}`}
-                      onClick={(e) => {
-                        if (e.metaKey || e.ctrlKey) return;
-                        e.preventDefault();
-                        onPhoneClick(c);
-                      }}
+                      onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center gap-1 text-primary font-mono"
                     >
                       📞 {c.phone}
@@ -699,6 +941,39 @@ export function CompaniesTable({
         )}
       </div>
 
+      {/* Desktop: column picker + reset */}
+      <div className="hidden md:flex items-center justify-end gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
+            <Columns3 className="h-3.5 w-3.5" />
+            Columns
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+            <div className="px-1.5 py-1 text-xs font-medium text-muted-foreground">
+              Toggle columns
+            </div>
+            <DropdownMenuSeparator />
+            {table
+              .getAllLeafColumns()
+              .filter((c) => c.getCanHide())
+              .map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column.id}
+                  checked={column.getIsVisible()}
+                  onCheckedChange={(v) => column.toggleVisibility(!!v)}
+                  closeOnClick={false}
+                >
+                  {COLUMN_LABELS[column.id] ?? column.id}
+                </DropdownMenuCheckboxItem>
+              ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={resetColumns}>
+              Reset to defaults
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       {/* Desktop: full table */}
       <div className="hidden md:block border rounded-lg overflow-auto bg-card shadow-sm">
         <Table
@@ -711,31 +986,60 @@ export function CompaniesTable({
           <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id} className="hover:bg-transparent">
-                {hg.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    className="relative text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-                    style={{ width: header.getSize() }}
-                  >
-                    {header.isPlaceholder ? null : (
-                      <button
-                        type="button"
-                        onClick={header.column.getToggleSortingHandler()}
-                        disabled={!header.column.getCanSort()}
-                        className="flex items-center gap-1 w-full text-left hover:text-foreground disabled:cursor-default"
-                      >
-                        <span className="truncate">
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                        </span>
-                        <SortIcon column={header.column} />
-                      </button>
-                    )}
-                    <ColumnResizer header={header} />
-                  </TableHead>
-                ))}
+                {hg.headers.map((header) => {
+                  const isDragOver = dragOverId === header.column.id;
+                  return (
+                    <TableHead
+                      key={header.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData(
+                          "text/column-id",
+                          header.column.id
+                        );
+                      }}
+                      onDragEnter={(e) => {
+                        e.preventDefault();
+                        setDragOverId(header.column.id);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                      }}
+                      onDragLeave={() => setDragOverId(null)}
+                      onDragEnd={() => setDragOverId(null)}
+                      onDrop={handleDrop(header.column.id)}
+                      className={`relative text-xs font-semibold tracking-wide text-muted-foreground uppercase cursor-grab active:cursor-grabbing ${
+                        isDragOver
+                          ? "outline outline-2 outline-primary -outline-offset-2"
+                          : ""
+                      }`}
+                      style={{ width: header.getSize() }}
+                    >
+                      {header.isPlaceholder ? null : (
+                        <div className="flex items-center gap-1 w-full">
+                          <GripVertical className="h-3 w-3 shrink-0 opacity-30" />
+                          <button
+                            type="button"
+                            onClick={header.column.getToggleSortingHandler()}
+                            disabled={!header.column.getCanSort()}
+                            className="flex items-center gap-1 flex-1 min-w-0 text-left hover:text-foreground disabled:cursor-default"
+                          >
+                            <span className="truncate">
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                            </span>
+                            <SortIcon column={header.column} />
+                          </button>
+                        </div>
+                      )}
+                      <ColumnResizer header={header} />
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>

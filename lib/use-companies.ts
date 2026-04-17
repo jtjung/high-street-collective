@@ -5,10 +5,12 @@ import type { Tables } from "@/lib/supabase/types";
 
 export type Company = Tables<"companies"> & {
   last_reached_out: string | null;
+  latest_note_content: string | null;
+  call_count: number;
 };
 
 const CACHE_KEY = "hsc:companies";
-const CACHE_VERSION = "v2"; // bumped for pain_points + reason fields
+const CACHE_VERSION = "v4"; // bumped for latest_note_content + call_count fields
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 
 type Cached = {
@@ -51,8 +53,8 @@ export function clearCompaniesCache() {
 }
 
 export function useCompanies() {
-  const [companies, setCompanies] = useState<Company[]>(() => readCache() ?? []);
-  const [loading, setLoading] = useState(companies.length === 0);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchCompanies = useCallback(async (force = false) => {

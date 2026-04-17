@@ -12,6 +12,7 @@ import * as XLSX from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
 import type { Json } from "../lib/supabase/types";
+import { lookupAreas, type PostcodeResult } from "../lib/postcodes";
 
 const OUTSCRAPER_API_KEY = "NGRkMzVmOTE5Njg1NDQ3Zjk1MzJmOWIwZGNlYTczNWR8ODBhNTc1MGMxOA";
 const SUPABASE_URL = "https://bddlrsqatgqoznyegpeq.supabase.co";
@@ -61,6 +62,7 @@ function parseWorkingHours(value: unknown): Json | null {
   }
 }
 
+
 async function main() {
   console.log("Fetching task list from Outscraper...");
 
@@ -104,6 +106,13 @@ async function main() {
 
     console.log(`  Parsed ${rows.length} rows from XLSX`);
 
+    // Resolve areas for all postcodes in this task via postcodes.io
+    const allPostcodes = rows
+      .map((row) => cleanString(row["postal_code"]))
+      .filter((p): p is string => p !== null && p.trim().length > 0);
+    const areaMap = await lookupAreas(allPostcodes);
+    console.log(`  Resolved areas for ${areaMap.size} postcodes`);
+
     const companies = rows
       .map((row) => {
         const name = cleanString(row["name"]);
@@ -111,6 +120,7 @@ async function main() {
         const placeId = cleanString(row["place_id"]);
         if (!placeId) return null;
 
+        const postalCode = cleanString(row["postal_code"]);
         return {
           name,
           subtypes: row["subtypes"]
@@ -125,7 +135,9 @@ async function main() {
           address: cleanString(row["address"]),
           street: cleanString(row["street"]),
           city: cleanString(row["city"]),
-          postal_code: cleanString(row["postal_code"]),
+          postal_code: postalCode,
+          area: (postalCode && areaMap.get(postalCode.toUpperCase())?.area) || null,
+          neighborhood: (postalCode && areaMap.get(postalCode.toUpperCase())?.neighborhood) || null,
           country_code: cleanString(row["country_code"]) || "GB",
           verified: parseBool(row["verified"]),
           rating: parseNumber(row["rating"]),

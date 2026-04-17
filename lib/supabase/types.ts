@@ -114,12 +114,15 @@ export type Database = {
           last_called_at: string | null
           linkedin: string | null
           location_link: string | null
+          manager_name: string | null
           name: string
+          neighborhood: string | null
           not_interested_reason: string | null
           outcomes: string[]
           outscraper_place_id: string | null
-          pain_points: string[]
           outscraper_task_id: string | null
+          owner_name: string | null
+          pain_points: string[]
           phone: string | null
           phone_carrier_type: string | null
           postal_code: string | null
@@ -130,6 +133,7 @@ export type Database = {
           street: string | null
           subtypes: string[] | null
           updated_at: string
+          user_goals: string[]
           verified: boolean | null
           website: string | null
           working_hours: Json | null
@@ -158,12 +162,15 @@ export type Database = {
           last_called_at?: string | null
           linkedin?: string | null
           location_link?: string | null
+          manager_name?: string | null
           name: string
+          neighborhood?: string | null
           not_interested_reason?: string | null
           outcomes?: string[]
           outscraper_place_id?: string | null
-          pain_points?: string[]
           outscraper_task_id?: string | null
+          owner_name?: string | null
+          pain_points?: string[]
           phone?: string | null
           phone_carrier_type?: string | null
           postal_code?: string | null
@@ -174,6 +181,7 @@ export type Database = {
           street?: string | null
           subtypes?: string[] | null
           updated_at?: string
+          user_goals?: string[]
           verified?: boolean | null
           website?: string | null
           working_hours?: Json | null
@@ -202,12 +210,15 @@ export type Database = {
           last_called_at?: string | null
           linkedin?: string | null
           location_link?: string | null
+          manager_name?: string | null
           name?: string
+          neighborhood?: string | null
           not_interested_reason?: string | null
           outcomes?: string[]
           outscraper_place_id?: string | null
-          pain_points?: string[]
           outscraper_task_id?: string | null
+          owner_name?: string | null
+          pain_points?: string[]
           phone?: string | null
           phone_carrier_type?: string | null
           postal_code?: string | null
@@ -218,6 +229,7 @@ export type Database = {
           street?: string | null
           subtypes?: string[] | null
           updated_at?: string
+          user_goals?: string[]
           verified?: boolean | null
           website?: string | null
           working_hours?: Json | null
@@ -260,6 +272,86 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "company_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_settings: {
+        Row: {
+          key: string
+          value: Json
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          value: Json
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          value?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      opportunities: {
+        Row: {
+          id: string
+          company_id: string
+          status: string
+          sample_website: string | null
+          sent_date: string | null
+          follow_up_date: string | null
+          discovery_meeting_contact: string | null
+          discovery_meeting_at: string | null
+          discovery_calendar_event_id: string | null
+          pilot_start_date: string | null
+          pilot_end_date: string | null
+          won_at: string | null
+          churned_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          status?: string
+          sample_website?: string | null
+          sent_date?: string | null
+          follow_up_date?: string | null
+          discovery_meeting_contact?: string | null
+          discovery_meeting_at?: string | null
+          discovery_calendar_event_id?: string | null
+          pilot_start_date?: string | null
+          pilot_end_date?: string | null
+          won_at?: string | null
+          churned_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          status?: string
+          sample_website?: string | null
+          sent_date?: string | null
+          follow_up_date?: string | null
+          discovery_meeting_contact?: string | null
+          discovery_meeting_at?: string | null
+          discovery_calendar_event_id?: string | null
+          pilot_start_date?: string | null
+          pilot_end_date?: string | null
+          won_at?: string | null
+          churned_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunities_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -344,13 +436,13 @@ export type Tables<
     : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
         DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
+  ? (DefaultSchema["Tables"] &
+      DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+    ? R
     : never
+  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
@@ -370,12 +462,12 @@ export type TablesInsert<
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+      Insert: infer I
+    }
+    ? I
     : never
+  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
@@ -395,12 +487,12 @@ export type TablesUpdate<
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+      Update: infer U
+    }
+    ? U
     : never
+  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
@@ -416,8 +508,8 @@ export type Enums<
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
@@ -433,8 +525,8 @@ export type CompositeTypes<
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
 export const Constants = {
   public: {

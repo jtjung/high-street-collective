@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getAuth } from "@/lib/get-auth";
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 
@@ -6,7 +6,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
+  const { userId } = await getAuth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -40,13 +40,16 @@ type CompanyPatch = {
   last_called_at?: string | null;
   not_interested_reason?: string | null;
   pain_points?: string[];
+  user_goals?: string[];
+  manager_name?: string | null;
+  owner_name?: string | null;
 };
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
+  const { userId } = await getAuth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -65,6 +68,9 @@ export async function PATCH(
   if (body.not_interested_reason !== undefined)
     update.not_interested_reason = body.not_interested_reason;
   if (body.pain_points !== undefined) update.pain_points = body.pain_points;
+  if (body.user_goals !== undefined) update.user_goals = body.user_goals;
+  if (body.manager_name !== undefined) update.manager_name = body.manager_name;
+  if (body.owner_name !== undefined) update.owner_name = body.owner_name;
 
   const { data, error } = await supabase
     .from("companies")

@@ -1,13 +1,14 @@
-import { auth } from "@clerk/nextjs/server";
+import { getAuth } from "@/lib/get-auth";
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 import { getTask, downloadTaskFile } from "@/lib/outscraper/client";
 import { parseOutscraperXlsx } from "@/lib/outscraper/parser";
+import { lookupAreas } from "@/lib/postcodes";
 
 export const maxDuration = 300;
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  const { userId } = await getAuth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -54,6 +55,21 @@ export async function POST(request: Request) {
     // Download and parse XLSX
     const buffer = await downloadTaskFile(dataResult.file_url);
     const companies = parseOutscraperXlsx(buffer, taskId);
+
+    // Enrich with area + neighborhood via postcodes.io
+    const postcodes = companies
+      .map((c) => c.postal_code)
+      .filter((p): p is string => !!p);
+    const areaMap = await lookupAreas(postcodes);
+    for (const company of companies) {
+      const result = company.postal_code
+        ? areaMap.get(company.postal_code.toUpperCase())
+        : undefined;
+      if (result) {
+        company.area = result.area;
+        company.neighborhood = result.neighborhood;
+      }
+    }
 
     let imported = 0;
     let skipped = 0;
