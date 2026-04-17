@@ -61,3 +61,24 @@ export const PAIN_POINTS: PainPointOption[] = [
 
 export const painPointLabel = (value: string): string =>
   PAIN_POINTS.find((p) => p.value === value)?.label ?? value;
+
+export type UserGoalOption = {
+  value: string;
+  label: string;
+};
+
+export const USER_GOALS: UserGoalOption[] = [
+  { value: "more_customers", label: "More customers" },
+  { value: "more_bookings", label: "More bookings" },
+  { value: "better_online_presence", label: "Better online presence" },
+  { value: "more_reviews", label: "More reviews" },
+  { value: "social_media_growth", label: "Social media growth" },
+  { value: "better_website", label: "Better website" },
+  { value: "google_ranking", label: "Rank higher on Google" },
+  { value: "more_enquiries", label: "More enquiries / leads" },
+  { value: "brand_awareness", label: "Local brand awareness" },
+  { value: "less_admin", label: "Less admin / automation" },
+];
+
+export const userGoalLabel = (value: string): string =>
+  USER_GOALS.find((g) => g.value === value)?.label ?? value;

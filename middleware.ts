@@ -5,6 +5,8 @@ export const runtime = "nodejs";
 
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
+  "/leads(.*)",
+  "/opportunities(.*)",
   "/api/((?!cron).*)",
 ]);
 

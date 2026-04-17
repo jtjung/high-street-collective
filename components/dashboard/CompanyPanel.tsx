@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   CheckCircle,
+  ExternalLink,
   Globe,
   History,
   Keyboard,
@@ -37,7 +38,9 @@ import {
   OUTCOME_OPTIONS,
   NOT_INTERESTED_REASONS,
   PAIN_POINTS,
+  USER_GOALS,
 } from "@/lib/outcomes";
+import { Input } from "@/components/ui/input";
 import { useCallHistory } from "@/lib/call-history";
 import type { Company } from "@/lib/use-companies";
 import type { Tables } from "@/lib/supabase/types";
@@ -94,6 +97,9 @@ export function CompanyPanel({
     null
   );
   const [painPoints, setPainPoints] = useState<string[]>([]);
+  const [userGoals, setUserGoals] = useState<string[]>([]);
+  const [managerName, setManagerName] = useState<string>("");
+  const [ownerName, setOwnerName] = useState<string>("");
 
   const [callbackDate, setCallbackDate] = useState<Date | undefined>();
   const [callbackTime, setCallbackTime] = useState<string>("10:00");
@@ -106,6 +112,9 @@ export function CompanyPanel({
     if (!company) return;
     setOutcomes(company.outcomes ?? []);
     setPainPoints(company.pain_points ?? []);
+    setUserGoals(company.user_goals ?? []);
+    setManagerName(company.manager_name ?? "");
+    setOwnerName(company.owner_name ?? "");
     setNotInterestedReason(company.not_interested_reason ?? null);
     setNoteInput("");
     if (company.callback_at) {
@@ -162,6 +171,8 @@ export function CompanyPanel({
     }
   };
 
+  const [opportunityLink, setOpportunityLink] = useState<string | null>(null);
+
   const toggleOutcome = useCallback(
     async (value: string) => {
       if (!company) return;
@@ -194,6 +205,20 @@ export function CompanyPanel({
         });
         if (!res.ok) throw new Error("Failed");
         onUpdated(company.id, patch);
+
+        // Auto-create opportunity when send_website is toggled on
+        if (isAdding && value === "send_website") {
+          fetch("/api/opportunities", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ company_id: company.id }),
+          }).then(() => {
+            setOpportunityLink("/opportunities");
+            toast.success("Lead converted to opportunity", {
+              action: { label: "View", onClick: () => window.open("/opportunities", "_blank") },
+            });
+          }).catch(() => {});
+        }
       } catch {
         toast.error("Failed to save outcome");
         setOutcomes(outcomes);
@@ -227,6 +252,47 @@ export function CompanyPanel({
     [company, painPoints, onUpdated]
   );
 
+  const toggleUserGoal = useCallback(
+    async (value: string) => {
+      if (!company) return;
+      const next = userGoals.includes(value)
+        ? userGoals.filter((g) => g !== value)
+        : [...userGoals, value];
+      setUserGoals(next);
+      try {
+        const res = await fetch(`/api/companies/${company.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_goals: next }),
+        });
+        if (!res.ok) throw new Error("Failed");
+        onUpdated(company.id, { user_goals: next });
+      } catch {
+        toast.error("Failed to save goals");
+        setUserGoals(userGoals);
+      }
+    },
+    [company, userGoals, onUpdated]
+  );
+
+  const saveTextField = useCallback(
+    async (field: "manager_name" | "owner_name", value: string) => {
+      if (!company) return;
+      try {
+        const res = await fetch(`/api/companies/${company.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [field]: value || null }),
+        });
+        if (!res.ok) throw new Error("Failed");
+        onUpdated(company.id, { [field]: value || null });
+      } catch {
+        toast.error("Failed to save");
+      }
+    },
+    [company, onUpdated]
+  );
+
   const updateReason = async (value: string) => {
     if (!company) return;
     setNotInterestedReason(value);
@@ -251,11 +317,14 @@ export function CompanyPanel({
       const dt = new Date(callbackDate);
       dt.setHours(hh, mm, 0, 0);
 
+      const existingEventId = company.calendar_event_id;
+      const isUpdate = !!existingEventId;
+
       const calRes = await fetch("/api/calendar/event", {
-        method: "POST",
+        method: isUpdate ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          companyId: company.id,
+          ...(isUpdate ? { eventId: existingEventId } : {}),
           companyName: company.name,
           phone: company.phone,
           address: company.address,
@@ -263,10 +332,10 @@ export function CompanyPanel({
         }),
       });
 
-      let calendarEventId: string | null = null;
+      let calendarEventId: string | null = existingEventId ?? null;
       if (calRes.ok) {
         const calData = (await calRes.json()) as { eventId?: string };
-        calendarEventId = calData.eventId ?? null;
+        calendarEventId = calData.eventId ?? calendarEventId;
       }
 
       const patch = {
@@ -295,13 +364,60 @@ export function CompanyPanel({
 
       toast.success(
         calendarEventId
-          ? "Callback scheduled + calendar invite sent"
-          : "Callback scheduled"
+          ? isUpdate
+            ? "Callback updated + calendar invite sent"
+            : "Callback scheduled + calendar invite sent"
+          : isUpdate
+            ? "Callback updated"
+            : "Callback scheduled"
       );
     } catch {
       toast.error("Failed to schedule callback");
     } finally {
       setSchedulingCallback(false);
+    }
+  };
+
+  const [cancellingCallback, setCancellingCallback] = useState(false);
+
+  const cancelCallback = async () => {
+    if (!company) return;
+    setCancellingCallback(true);
+    try {
+      if (company.calendar_event_id) {
+        await fetch(`/api/calendar/event?eventId=${encodeURIComponent(company.calendar_event_id)}`, {
+          method: "DELETE",
+        });
+      }
+
+      const patch = { callback_at: null, calendar_event_id: null };
+      const res = await fetch(`/api/companies/${company.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error("Failed");
+
+      const newOutcomes = outcomes.filter((o) => o !== "call_back_later");
+      if (newOutcomes.length !== outcomes.length) {
+        await fetch(`/api/companies/${company.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ outcomes: newOutcomes }),
+        });
+        setOutcomes(newOutcomes);
+        onUpdated(company.id, { outcomes: newOutcomes, ...patch });
+      } else {
+        onUpdated(company.id, patch);
+      }
+
+      setCallbackDate(undefined);
+      setCallbackTime("10:00");
+      toast.success("Callback cancelled");
+    } catch {
+      toast.error("Failed to cancel callback");
+    } finally {
+      setCancellingCallback(false);
     }
   };
 
@@ -311,8 +427,9 @@ export function CompanyPanel({
     const handler = (e: KeyboardEvent) => {
       const mod = isMac ? e.metaKey : e.ctrlKey;
       if (!mod) return;
-      // Don't hijack text-field usage for modifier combos that are common (e.g. copy/paste use shift too)
       if (e.shiftKey || e.altKey) return;
+      // Let Cmd+Z pass through to the global undo handler — don't intercept it here
+      if (e.key.toLowerCase() === "z") return;
 
       // Outcomes: Cmd+1..6
       const outcome = OUTCOME_OPTIONS.find((o) => o.shortcut === e.key);
@@ -347,6 +464,17 @@ export function CompanyPanel({
             <span className="truncate">{company.name}</span>
             {company.verified && (
               <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+            )}
+            {(opportunityLink || company.outcomes?.includes("send_website")) && (
+              <a
+                href="/opportunities"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-violet-600 hover:underline ml-auto shrink-0"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Opportunity
+              </a>
             )}
           </SheetTitle>
         </SheetHeader>
@@ -407,9 +535,20 @@ export function CompanyPanel({
             {company.rating && (
               <div className="flex items-center gap-2">
                 <Star className="h-4 w-4 text-yellow-500" />
-                <span>
-                  {company.rating} · {company.reviews ?? 0} reviews
-                </span>
+                {company.location_link ? (
+                  <a
+                    href={company.location_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {company.rating} · {company.reviews ?? 0} reviews
+                  </a>
+                ) : (
+                  <span>
+                    {company.rating} · {company.reviews ?? 0} reviews
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -530,7 +669,7 @@ export function CompanyPanel({
                   </Select>
                   <button
                     onClick={scheduleCallback}
-                    disabled={!callbackDate || schedulingCallback}
+                    disabled={!callbackDate || schedulingCallback || cancellingCallback}
                     className="w-full px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-1"
                   >
                     {schedulingCallback && (
@@ -541,10 +680,22 @@ export function CompanyPanel({
                       : "Schedule + invite"}
                   </button>
                   {company.callback_at && (
-                    <p className="text-[10px] text-muted-foreground">
-                      Current:{" "}
-                      {new Date(company.callback_at).toLocaleString()}
-                    </p>
+                    <>
+                      <p className="text-[10px] text-muted-foreground">
+                        Current:{" "}
+                        {new Date(company.callback_at).toLocaleString()}
+                      </p>
+                      <button
+                        onClick={cancelCallback}
+                        disabled={cancellingCallback || schedulingCallback}
+                        className="w-full px-3 py-1.5 text-xs border border-destructive/50 text-destructive rounded hover:bg-destructive/10 disabled:opacity-50 inline-flex items-center justify-center gap-1"
+                      >
+                        {cancellingCallback && (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        )}
+                        Cancel callback
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -582,6 +733,67 @@ export function CompanyPanel({
                       {modKey}
                       {pain.shortcut.toUpperCase()}
                     </Kbd>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Contact names */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Manager name</Label>
+              <Input
+                value={managerName}
+                onChange={(e) => setManagerName(e.target.value)}
+                onBlur={(e) => saveTextField("manager_name", e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur();
+                  }
+                }}
+                placeholder="e.g. Sarah Jones"
+                className="h-8 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Owner / Landlord name</Label>
+              <Input
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                onBlur={(e) => saveTextField("owner_name", e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur();
+                  }
+                }}
+                placeholder="e.g. Tom Smith"
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* User Goals */}
+          <div>
+            <Label className="text-sm font-semibold mb-2 block">User goals</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {USER_GOALS.map((goal) => {
+                const active = userGoals.includes(goal.value);
+                return (
+                  <button
+                    key={goal.value}
+                    onClick={() => toggleUserGoal(goal.value)}
+                    className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm transition-colors text-left ${
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-card hover:bg-accent"
+                    }`}
+                  >
+                    <span className="truncate">{goal.label}</span>
                   </button>
                 );
               })}

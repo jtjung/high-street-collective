@@ -54,8 +54,17 @@ import {
   ExternalLink,
   GripVertical,
 } from "lucide-react";
-import { outcomeLabel } from "@/lib/outcomes";
+import { outcomeLabel, painPointLabel, userGoalLabel } from "@/lib/outcomes";
 import type { Company } from "@/lib/use-companies";
+
+const OUTCOME_COLORS: Record<string, string> = {
+  send_website: "bg-green-100 text-green-800 border-green-200",
+  not_interested: "bg-red-100 text-red-800 border-red-200",
+  interested: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  dead_number: "bg-gray-100 text-gray-600 border-gray-200",
+  voicemail: "bg-orange-100 text-orange-800 border-orange-200",
+  call_back_later: "bg-orange-100 text-orange-800 border-orange-200",
+};
 
 const COLUMN_WIDTHS_KEY = "hsc:columnWidths:v2";
 const COLUMN_ORDER_KEY = "hsc:columnOrder:v1";
@@ -82,6 +91,14 @@ const COLUMN_LABELS: Record<string, string> = {
   outcomes: "Outcomes",
   last_reached_out: "Last Reached",
   callback_at: "Callback",
+  pain_points: "Pain Points",
+  latest_note_content: "Latest Note",
+  call_count: "Calls",
+  rating: "Rating",
+  reviews: "Reviews",
+  manager_name: "Manager",
+  owner_name: "Owner / Landlord",
+  user_goals: "Goals",
 };
 
 function useLocalStorageState<T>(key: string, initial: T) {
@@ -329,7 +346,7 @@ export function CompaniesTable({
         cell: ({ getValue, row }) => (
           <button
             onClick={() => onPhoneClick(row.original)}
-            className="text-left font-medium hover:underline truncate max-w-full"
+            className="text-left font-medium hover:underline truncate max-w-full cursor-pointer"
           >
             {getValue() as string}
           </button>
@@ -547,7 +564,7 @@ export function CompaniesTable({
               {outs.map((o) => (
                 <Badge
                   key={o}
-                  className="text-[10px] px-1 py-0 font-normal"
+                  className={`text-[10px] px-1 py-0 font-normal border ${OUTCOME_COLORS[o] ?? ""}`}
                 >
                   {outcomeLabel(o)}
                 </Badge>
@@ -586,6 +603,113 @@ export function CompaniesTable({
         },
         size: 100,
         sortingFn: "datetime",
+      },
+      {
+        accessorKey: "pain_points",
+        header: "Pain Points",
+        cell: ({ getValue }) => {
+          const pts = (getValue() as string[] | null) ?? [];
+          if (!pts.length) return <span className="text-muted-foreground">—</span>;
+          return (
+            <div className="flex flex-wrap gap-0.5">
+              {pts.map((p) => (
+                <Badge key={p} variant="secondary" className="text-[10px] px-1 py-0 font-normal">
+                  {painPointLabel(p)}
+                </Badge>
+              ))}
+            </div>
+          );
+        },
+        size: 200,
+        enableSorting: false,
+      },
+      {
+        accessorKey: "latest_note_content",
+        header: "Latest Note",
+        cell: ({ getValue }) => {
+          const note = getValue() as string | null;
+          if (!note) return <span className="text-muted-foreground">—</span>;
+          const truncated = note.length > 60 ? note.slice(0, 60) + "…" : note;
+          return (
+            <span className="text-xs text-muted-foreground truncate block" title={note}>
+              {truncated}
+            </span>
+          );
+        },
+        size: 200,
+        enableSorting: false,
+      },
+      {
+        accessorKey: "call_count",
+        header: "Calls",
+        cell: ({ getValue }) => {
+          const count = (getValue() as number) ?? 0;
+          return <span className="text-xs font-mono">{count || "—"}</span>;
+        },
+        size: 60,
+      },
+      {
+        accessorKey: "rating",
+        header: "Rating",
+        cell: ({ getValue }) => {
+          const r = getValue() as number | null;
+          if (!r) return <span className="text-muted-foreground">—</span>;
+          return (
+            <span className="text-xs font-medium">
+              ★ {r.toFixed(1)}
+            </span>
+          );
+        },
+        size: 70,
+      },
+      {
+        accessorKey: "reviews",
+        header: "Reviews",
+        cell: ({ getValue }) => {
+          const n = getValue() as number | null;
+          if (!n) return <span className="text-muted-foreground">—</span>;
+          return <span className="text-xs">{n.toLocaleString()}</span>;
+        },
+        size: 80,
+      },
+      {
+        accessorKey: "manager_name",
+        header: "Manager",
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          return <span className="text-xs">{v}</span>;
+        },
+        size: 140,
+      },
+      {
+        accessorKey: "owner_name",
+        header: "Owner / Landlord",
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          return <span className="text-xs">{v}</span>;
+        },
+        size: 160,
+      },
+      {
+        accessorKey: "user_goals",
+        header: "Goals",
+        cell: ({ getValue }) => {
+          const goals = (getValue() as string[] | null) ?? [];
+          if (!goals.length) return <span className="text-muted-foreground">—</span>;
+          return (
+            <div className="flex flex-wrap gap-0.5">
+              {goals.map((g) => (
+                <Badge key={g} variant="secondary" className="text-[10px] px-1 py-0 font-normal">
+                  {userGoalLabel(g)}
+                </Badge>
+              ))}
+            </div>
+          );
+        },
+        size: 200,
+        enableSorting: false,
       },
     ],
     [onPhoneClick, onTypeClick]
@@ -720,7 +844,7 @@ export function CompaniesTable({
                       outs.slice(0, 2).map((o) => (
                         <Badge
                           key={o}
-                          className="text-[10px] px-1 py-0 font-normal"
+                          className={`text-[10px] px-1 py-0 font-normal border ${OUTCOME_COLORS[o] ?? ""}`}
                         >
                           {outcomeLabel(o)}
                         </Badge>
