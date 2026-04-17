@@ -71,13 +71,23 @@ export async function POST(request: Request) {
       }
     }
 
+    // Deduplicate by outscraper_place_id — duplicates within a batch cause
+    // "ON CONFLICT DO UPDATE command cannot affect row a second time"
+    const seen = new Set<string>();
+    const deduped = companies.filter((c) => {
+      if (!c.outscraper_place_id) return true;
+      if (seen.has(c.outscraper_place_id)) return false;
+      seen.add(c.outscraper_place_id);
+      return true;
+    });
+
     let imported = 0;
     let skipped = 0;
 
     // Upsert in batches of 100
     const batchSize = 100;
-    for (let i = 0; i < companies.length; i += batchSize) {
-      const batch = companies.slice(i, i + batchSize);
+    for (let i = 0; i < deduped.length; i += batchSize) {
+      const batch = deduped.slice(i, i + batchSize);
 
       const { error: upsertError, count } = await supabase
         .from("companies")
@@ -100,7 +110,7 @@ export async function POST(request: Request) {
       .from("outscraper_sync_log")
       .update({
         status: "completed",
-        records_total: companies.length,
+        records_total: deduped.length,
         records_imported: imported,
         records_skipped: skipped,
         completed_at: new Date().toISOString(),

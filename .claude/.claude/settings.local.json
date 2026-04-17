@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir=false --import-alias=\"@/*\" --use-pnpm --yes)",
+      "Bash(npx create-next-app@latest hsc-crm --typescript --tailwind --eslint --app --src-dir=false --import-alias=\"@/*\" --use-pnpm --yes)",
+      "Bash(shopt -s dotglob)",
+      "Bash(mv hsc-crm/* .)",
+      "Bash(mv hsc-crm/.* .)",
+      "Bash(rmdir hsc-crm:*)",
+      "Bash(mv src/app .)",
+      "Bash(rm -rf src)"
+    ]
+  }
+}

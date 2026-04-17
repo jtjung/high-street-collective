@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(vercel --version)",
+      "Bash(vercel)",
+      "mcp__supabase__apply_migration",
+      "Bash(npx tsx *)",
+      "Skill(commit-commands:commit-push-pr)",
+      "Skill(commit-commands:commit-push-pr:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(vercel --prod)",
+      "Bash(npx tsc *)",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__generate_typescript_types",
+      "Bash(git -C /Users/jjung/Documents/Codespace/high-street-collective status --porcelain)",
+      "Bash(gh pr *)",
+      "mcp__supabase__get_logs",
+      "Bash(vercel --yes)",
+      "Bash(tee /tmp/vercel-deploy.log)"
+    ]
+  }
+}

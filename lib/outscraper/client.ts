@@ -20,6 +20,12 @@ export interface OutscraperTask {
     categories?: string[];
     locations?: string[];
     tags?: string;
+    language?: string;
+    organizations_per_query?: number;
+    limit?: number;
+    drop_duplicates?: boolean;
+    enrichments?: string[];
+    [key: string]: unknown;
   };
 }
 
