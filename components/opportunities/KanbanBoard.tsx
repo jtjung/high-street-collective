@@ -9,7 +9,7 @@ import { OpportunityPanel } from "./OpportunityPanel";
 import type { Tables } from "@/lib/supabase/types";
 import type { Company } from "@/lib/use-companies";
 import { UserButton } from "@clerk/nextjs";
-import Link from "next/link";
+import { NavTabs } from "@/components/NavTabs";
 
 export type Opportunity = Tables<"opportunities"> & {
   company: Pick<
@@ -284,18 +284,13 @@ export function KanbanBoard() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b bg-card px-4 py-2.5 shrink-0">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/leads" className="text-muted-foreground hover:text-foreground text-sm">
-              ← Leads
-            </Link>
-            <div className="min-w-0">
-              <h1 className="text-sm font-semibold tracking-tight">Opportunities</h1>
-              <p className="text-[10px] text-muted-foreground">
-                {opportunities.length} total
-              </p>
-            </div>
+      <header className="border-b bg-card px-4 pt-2.5 pb-0 shrink-0">
+        <div className="flex items-center justify-between gap-2 pb-2.5">
+          <div className="min-w-0">
+            <h1 className="text-sm font-semibold tracking-tight">Opportunities</h1>
+            <p className="text-[10px] text-muted-foreground">
+              {opportunities.length} total
+            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
@@ -305,15 +300,10 @@ export function KanbanBoard() {
               <RefreshCw className="h-3.5 w-3.5" />
               Refresh
             </button>
-            <Link
-              href="/goals"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors"
-            >
-              Goals
-            </Link>
             <UserButton />
           </div>
         </div>
+        <NavTabs />
       </header>
 
       {loading ? (

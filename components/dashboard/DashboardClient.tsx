@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { UserButton } from "@clerk/nextjs";
-import Link from "next/link";
 import type { ColumnFiltersState, SortingState } from "@tanstack/react-table";
 import { CompaniesTable } from "./CompaniesTable";
 import { CompanyPanel } from "./CompanyPanel";
@@ -18,6 +17,7 @@ import {
 import { RefreshCw, Search, X } from "lucide-react";
 import { useCompanies, type Company } from "@/lib/use-companies";
 import { OUTCOME_OPTIONS } from "@/lib/outcomes";
+import { NavTabs } from "@/components/NavTabs";
 
 const FILTERS_KEY = "hsc:columnFilters:v2";
 const SORTING_KEY = "hsc:sorting:v2";
@@ -238,8 +238,8 @@ export function DashboardClient() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card px-3 sm:px-4 py-2.5 sm:py-3">
-        <div className="flex items-center justify-between gap-2">
+      <header className="border-b bg-card px-3 sm:px-4 pt-2.5 sm:pt-3 pb-0">
+        <div className="flex items-center justify-between gap-2 pb-2.5 sm:pb-3">
           <div className="min-w-0">
             <h1 className="text-sm sm:text-base font-semibold tracking-tight truncate">
               HSC CRM
@@ -258,15 +258,10 @@ export function DashboardClient() {
               <span className="hidden sm:inline">Refresh</span>
             </button>
             <SyncButton onSyncComplete={refresh} />
-            <Link
-              href="/goals"
-              className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors"
-            >
-              Goals
-            </Link>
             <UserButton />
           </div>
         </div>
+        <NavTabs />
       </header>
 
       {/* Control bar */}

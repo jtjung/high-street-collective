@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
-import Link from "next/link";
+import { NavTabs } from "@/components/NavTabs";
 import { Check, Pencil, TrendingUp, X } from "lucide-react";
 
 type GoalsData = {
@@ -175,19 +175,15 @@ export function GoalsClient() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b bg-card px-4 py-2.5 shrink-0">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/leads" className="text-muted-foreground hover:text-foreground text-sm">
-              ← Leads
-            </Link>
-            <div className="min-w-0">
-              <h1 className="text-sm font-semibold tracking-tight">Goals</h1>
-              <p className="text-[10px] text-muted-foreground">{totalActiveCustomers} active customers</p>
-            </div>
+      <header className="border-b bg-card px-4 pt-2.5 pb-0 shrink-0">
+        <div className="flex items-center justify-between gap-2 pb-2.5">
+          <div className="min-w-0">
+            <h1 className="text-sm font-semibold tracking-tight">Goals</h1>
+            <p className="text-[10px] text-muted-foreground">{totalActiveCustomers} active customers</p>
           </div>
           <UserButton />
         </div>
+        <NavTabs />
       </header>
 
       <div className="flex-1 p-6 max-w-5xl mx-auto w-full space-y-8">
