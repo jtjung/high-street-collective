@@ -80,7 +80,7 @@ const OUTCOME_COLORS: Record<string, string> = {
 };
 
 const COLUMN_WIDTHS_KEY = "hsc:columnWidths:v2";
-const COLUMN_ORDER_KEY = "hsc:columnOrder:v1";
+const COLUMN_ORDER_KEY = "hsc:columnOrder:v2"; // bumped: __select__ always first
 const COLUMN_VISIBILITY_KEY = "hsc:columnVisibility:v1";
 const PAGE_SIZE_KEY = "hsc:pageSize:v1";
 
@@ -131,6 +131,10 @@ const DISTINCT_COLUMNS = new Set([
 
 // Columns that accept numeric comparison filters: `<N`, `>N`, `=N`.
 const NUMERIC_COLUMNS = new Set(["call_count", "rating", "reviews"]);
+
+// Static-config columns that should render as multi-select checklists
+// rather than single-select dropdowns in the Filter popover.
+const MULTI_SELECT_STATIC_COLUMNS = new Set(["outcomes"]);
 
 // Static (non-data-driven) filter shapes. Distinct/numeric columns are handled
 // separately and should NOT appear here.
@@ -211,6 +215,99 @@ const COLUMN_FILTER_CONFIGS: Partial<Record<string, FilterConfig>> = {
     ],
   },
 };
+
+/**
+ * Coerce a filter value (string | string[] | undefined) to a non-empty
+ * string array, or null (= no filter active).
+ */
+function toFilterArray(raw: unknown): string[] | null {
+  if (Array.isArray(raw)) {
+    const arr = raw.filter((x) => typeof x === "string" && x !== "") as string[];
+    return arr.length ? arr : null;
+  }
+  if (typeof raw === "string" && raw !== "" && raw !== "__all__") return [raw];
+  return null;
+}
+
+/** Small multi-select checklist rendered inside the Filter popover. */
+function MultiSelectFilter({
+  options,
+  values,
+  onChange,
+  search = false,
+}: {
+  options: { value: string; label: string }[];
+  values: string[];
+  onChange: (next: string[]) => void;
+  search?: boolean;
+}) {
+  const [q, setQ] = useState("");
+  const filtered = q
+    ? options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
+    : options;
+  const toggle = (v: string) => {
+    const next = values.includes(v)
+      ? values.filter((x) => x !== v)
+      : [...values, v];
+    onChange(next);
+  };
+  return (
+    <div className="space-y-1">
+      {search && options.length > 8 && (
+        <div className="relative">
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search…"
+            className="h-6 text-xs pr-6"
+          />
+          {q && (
+            <button
+              onClick={() => setQ("")}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      )}
+      <div className="max-h-52 overflow-y-auto space-y-0.5">
+        {filtered.length === 0 ? (
+          <p className="text-[10px] text-muted-foreground px-1 py-1">
+            No options match.
+          </p>
+        ) : (
+          filtered.map((opt) => {
+            const checked = values.includes(opt.value);
+            return (
+              <label
+                key={opt.value}
+                className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-muted cursor-pointer select-none"
+              >
+                <Checkbox
+                  checked={checked}
+                  onCheckedChange={() => toggle(opt.value)}
+                  className="h-3.5 w-3.5 shrink-0"
+                />
+                <span className={`text-xs truncate ${checked ? "font-medium" : ""}`}>
+                  {opt.label}
+                </span>
+              </label>
+            );
+          })
+        )}
+      </div>
+      {values.length > 0 && (
+        <button
+          onClick={() => onChange([])}
+          className="text-[10px] text-muted-foreground hover:text-foreground pt-0.5"
+        >
+          Clear ({values.length})
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** UK outward code — the token before the space in a postal code. */
 function outwardCode(pc: string | null | undefined): string | null {
@@ -480,8 +577,10 @@ export function CompaniesTable({
         },
         size: 140,
         filterFn: (row, id, value) => {
+          const vals = toFilterArray(value);
+          if (!vals) return true;
           const v = (row.getValue(id) as string | null) ?? "";
-          return v.toLowerCase() === String(value).toLowerCase();
+          return vals.some((val) => v.toLowerCase() === val.toLowerCase());
         },
       },
       {
@@ -500,8 +599,10 @@ export function CompaniesTable({
         },
         size: 160,
         filterFn: (row, id, value) => {
+          const vals = toFilterArray(value);
+          if (!vals) return true;
           const v = (row.getValue(id) as string | null) ?? "";
-          return v.toLowerCase() === String(value).toLowerCase();
+          return vals.some((val) => v.toLowerCase() === val.toLowerCase());
         },
       },
       {
@@ -514,12 +615,14 @@ export function CompaniesTable({
         ),
         size: 90,
         filterFn: (row, id, value) => {
+          const vals = toFilterArray(value);
+          if (!vals) return true;
           const pc = String(row.getValue(id) ?? "").toUpperCase();
-          const target = String(value).toUpperCase();
-          if (!target) return true;
           const outward = outwardCode(pc);
-          // Match on outward code (dropdown selection) OR prefix (typed text).
-          return outward === target || pc.startsWith(target);
+          return vals.some((val) => {
+            const target = val.toUpperCase();
+            return outward === target || pc.startsWith(target);
+          });
         },
       },
       {
@@ -558,13 +661,15 @@ export function CompaniesTable({
         },
         size: 150,
         filterFn: (row, id, value) => {
+          const vals = toFilterArray(value);
+          if (!vals) return true;
           const subs = (row.getValue(id) as string[] | null) ?? [];
-          const v = String(value).toLowerCase();
-          // Exact match for dropdown selections; substring match as fallback
-          // (so text-typed filters from elsewhere still work).
-          return subs.some(
-            (s) => s.toLowerCase() === v || s.toLowerCase().includes(v)
-          );
+          return vals.some((val) => {
+            const needle = val.toLowerCase();
+            return subs.some(
+              (s) => s.toLowerCase() === needle || s.toLowerCase().includes(needle)
+            );
+          });
         },
       },
       {
@@ -826,10 +931,13 @@ export function CompaniesTable({
         size: 170,
         filterFn: (row, id, value) => {
           const outs = (row.getValue(id) as string[]) ?? [];
-          if (value === "__uncalled__") return outs.length === 0;
-          if (value === "__any__") return outs.length > 0;
-          const v = String(value).toLowerCase();
-          return outs.some((o) => outcomeLabel(o).toLowerCase().includes(v));
+          const vals = toFilterArray(value);
+          if (!vals) return true;
+          if (vals.includes("__uncalled__")) return outs.length === 0;
+          if (vals.includes("__any__")) return outs.length > 0;
+          return vals.some((v) =>
+            outs.some((o) => outcomeLabel(o).toLowerCase().includes(v.toLowerCase()))
+          );
         },
       },
       {
@@ -1105,13 +1213,21 @@ export function CompaniesTable({
     e.preventDefault();
     const sourceId = e.dataTransfer.getData("text/column-id");
     setDragOverId(null);
+    // Never drag the selection checkbox column or drop onto it
     if (!sourceId || sourceId === targetId) return;
+    if (sourceId === "__select__" || targetId === "__select__") return;
     const base = columnOrder.length ? [...columnOrder] : [...allLeafColumnIds];
     const from = base.indexOf(sourceId);
     const to = base.indexOf(targetId);
     if (from === -1 || to === -1) return;
     base.splice(from, 1);
     base.splice(to, 0, sourceId);
+    // Always keep __select__ pinned to position 0
+    if (selectionEnabled) {
+      const si = base.indexOf("__select__");
+      if (si > 0) { base.splice(si, 1); base.unshift("__select__"); }
+      else if (si === -1) base.unshift("__select__");
+    }
     setColumnOrder(base);
   };
 
@@ -1319,25 +1435,20 @@ export function CompaniesTable({
                           distinctOptions[
                             column.id as keyof typeof distinctOptions
                           ] ?? [];
+                        const selectedVals = Array.isArray(value)
+                          ? (value as string[])
+                          : value
+                            ? [value as string]
+                            : [];
                         body = (
-                          <Select
-                            value={(value as string) ?? "__all__"}
-                            onValueChange={(v) =>
-                              column.setFilterValue(v === "__all__" ? undefined : v)
+                          <MultiSelectFilter
+                            options={opts.map((o) => ({ value: o, label: o }))}
+                            values={selectedVals}
+                            onChange={(next) =>
+                              column.setFilterValue(next.length ? next : undefined)
                             }
-                          >
-                            <SelectTrigger className="h-7 text-xs">
-                              <SelectValue placeholder="Any" />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-72">
-                              <SelectItem value="__all__">Any</SelectItem>
-                              {opts.map((opt) => (
-                                <SelectItem key={opt} value={opt}>
-                                  {opt}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            search
+                          />
                         );
                       } else if (NUMERIC_COLUMNS.has(column.id)) {
                         const parsed = parseNumericOp(value);
@@ -1388,6 +1499,28 @@ export function CompaniesTable({
                               )}
                             </div>
                           </div>
+                        );
+                      } else if (
+                        staticConfig?.type === "select" &&
+                        MULTI_SELECT_STATIC_COLUMNS.has(column.id)
+                      ) {
+                        // Multi-select checklist for static-config columns like outcomes
+                        const opts = staticConfig.options.filter(
+                          (o) => o.value !== "__all__"
+                        );
+                        const selectedVals = Array.isArray(value)
+                          ? (value as string[])
+                          : value
+                            ? [value as string]
+                            : [];
+                        body = (
+                          <MultiSelectFilter
+                            options={opts}
+                            values={selectedVals}
+                            onChange={(next) =>
+                              column.setFilterValue(next.length ? next : undefined)
+                            }
+                          />
                         );
                       } else if (staticConfig?.type === "select") {
                         body = (

@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown, X } from "lucide-react";
 import type { Company } from "@/lib/use-companies";
 import { OUTCOME_OPTIONS } from "@/lib/outcomes";
 
@@ -35,9 +35,13 @@ const OUTCOME_QUICK_OPTIONS = [
 
 interface QuickFilterChipProps {
   label: string;
-  value: string | undefined;
+  // For single-select columns, this is string|undefined.
+  // For multi-select columns, this is string[] (may be empty = inactive).
+  value: string | string[] | undefined;
   options: { value: string; label: string }[];
-  onChange: (v: string | undefined) => void;
+  onChangeSingle?: (v: string | undefined) => void;
+  onToggleMulti?: (v: string) => void;
+  onClearMulti?: () => void;
   emptyHint?: string;
 }
 
@@ -45,14 +49,30 @@ function QuickFilterChip({
   label,
   value,
   options,
-  onChange,
+  onChangeSingle,
+  onToggleMulti,
+  onClearMulti,
   emptyHint,
 }: QuickFilterChipProps) {
-  const active = value !== undefined;
-  const displayLabel = active
-    ? options.find((o) => o.value === value)?.label ?? value
-    : null;
+  const isMulti = Array.isArray(value);
+  const multiValues = isMulti ? value : [];
+  const active = isMulti ? multiValues.length > 0 : value !== undefined;
+
+  // Derive display label
+  let displayLabel: string | null = null;
+  if (isMulti && multiValues.length > 0) {
+    if (multiValues.length === 1) {
+      displayLabel =
+        options.find((o) => o.value === multiValues[0])?.label ?? multiValues[0];
+    } else {
+      displayLabel = `${multiValues.length} selected`;
+    }
+  } else if (!isMulti && value !== undefined) {
+    displayLabel = options.find((o) => o.value === value)?.label ?? (value as string);
+  }
+
   const hasOptions = options.length > 0;
+
   return (
     <div className="inline-flex items-center">
       <DropdownMenu>
@@ -83,23 +103,52 @@ function QuickFilterChip({
               {emptyHint ?? "No options"}
             </div>
           ) : (
-            options.map((opt) => (
-              <DropdownMenuItem
-                key={opt.value}
-                onClick={() =>
-                  onChange(opt.value === value ? undefined : opt.value)
-                }
-                className={value === opt.value ? "bg-accent font-medium" : ""}
-              >
-                {opt.label}
-              </DropdownMenuItem>
-            ))
+            options.map((opt) => {
+              const checked = isMulti
+                ? multiValues.includes(opt.value)
+                : value === opt.value;
+              return (
+                <DropdownMenuItem
+                  key={opt.value}
+                  onClick={() => {
+                    if (isMulti) {
+                      onToggleMulti?.(opt.value);
+                    } else {
+                      onChangeSingle?.(
+                        opt.value === value ? undefined : opt.value
+                      );
+                    }
+                  }}
+                  className={checked ? "bg-accent" : ""}
+                  closeOnClick={isMulti ? false : true}
+                >
+                  <div className="flex items-center gap-2 w-full">
+                    <span
+                      className={`h-3.5 w-3.5 shrink-0 flex items-center justify-center rounded border border-muted-foreground/30 ${checked ? "bg-primary border-primary" : ""}`}
+                    >
+                      {checked && (
+                        <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                      )}
+                    </span>
+                    <span className={checked ? "font-medium" : ""}>
+                      {opt.label}
+                    </span>
+                  </div>
+                </DropdownMenuItem>
+              );
+            })
           )}
         </DropdownMenuContent>
       </DropdownMenu>
       {active && (
         <button
-          onClick={() => onChange(undefined)}
+          onClick={() => {
+            if (isMulti) {
+              onClearMulti?.();
+            } else {
+              onChangeSingle?.(undefined);
+            }
+          }}
           className="ml-0.5 inline-flex items-center justify-center w-5 h-5 rounded hover:bg-destructive/10 text-primary"
           aria-label={`Clear ${label} filter`}
           title={`Clear ${label} filter`}
@@ -135,16 +184,49 @@ export function QuickFilters({
     [companies]
   );
 
-  const getValue = (id: string) => {
+  // Get current single-select value for a column
+  const getSingle = (id: string): string | undefined => {
     const f = columnFilters.find((x) => x.id === id);
-    return f?.value === undefined ? undefined : String(f.value);
+    if (!f) return undefined;
+    return typeof f.value === "string" ? f.value : undefined;
   };
 
-  const setValue = (id: string, v: string | undefined) => {
+  // Get current multi-select values for a column
+  const getMulti = (id: string): string[] => {
+    const f = columnFilters.find((x) => x.id === id);
+    if (!f) return [];
+    if (Array.isArray(f.value)) return f.value as string[];
+    if (typeof f.value === "string" && f.value) return [f.value];
+    return [];
+  };
+
+  const setSingle = (id: string, v: string | undefined) => {
     onFiltersChange((prev) => {
       const rest = prev.filter((x) => x.id !== id);
       return v === undefined ? rest : [...rest, { id, value: v }];
     });
+  };
+
+  const toggleMulti = (id: string, v: string) => {
+    onFiltersChange((prev) => {
+      const existing = prev.find((x) => x.id === id);
+      const current: string[] = existing
+        ? Array.isArray(existing.value)
+          ? (existing.value as string[])
+          : typeof existing.value === "string"
+            ? [existing.value]
+            : []
+        : [];
+      const next = current.includes(v)
+        ? current.filter((x) => x !== v)
+        : [...current, v];
+      const rest = prev.filter((x) => x.id !== id);
+      return next.length ? [...rest, { id, value: next }] : rest;
+    });
+  };
+
+  const clearMulti = (id: string) => {
+    onFiltersChange((prev) => prev.filter((x) => x.id !== id));
   };
 
   return (
@@ -154,42 +236,43 @@ export function QuickFilters({
       </span>
       <QuickFilterChip
         label="Website"
-        value={getValue("website")}
+        value={getSingle("website")}
         options={WEBSITE_OPTIONS}
-        onChange={(v) => setValue("website", v)}
+        onChangeSingle={(v) => setSingle("website", v)}
       />
       <QuickFilterChip
         label="Type"
-        value={getValue("subtypes")}
-        options={distinctOptions.subtypes.map((s) => ({
-          value: s,
-          label: s,
-        }))}
-        onChange={(v) => setValue("subtypes", v)}
+        value={getMulti("subtypes")}
+        options={distinctOptions.subtypes.map((s) => ({ value: s, label: s }))}
+        onToggleMulti={(v) => toggleMulti("subtypes", v)}
+        onClearMulti={() => clearMulti("subtypes")}
         emptyHint="No types in data"
       />
       <QuickFilterChip
         label="Area"
-        value={getValue("area")}
+        value={getMulti("area")}
         options={distinctOptions.area.map((s) => ({ value: s, label: s }))}
-        onChange={(v) => setValue("area", v)}
+        onToggleMulti={(v) => toggleMulti("area", v)}
+        onClearMulti={() => clearMulti("area")}
         emptyHint="No areas in data"
       />
       <QuickFilterChip
         label="Neighbourhood"
-        value={getValue("neighborhood")}
+        value={getMulti("neighborhood")}
         options={distinctOptions.neighborhood.map((s) => ({
           value: s,
           label: s,
         }))}
-        onChange={(v) => setValue("neighborhood", v)}
+        onToggleMulti={(v) => toggleMulti("neighborhood", v)}
+        onClearMulti={() => clearMulti("neighborhood")}
         emptyHint="No neighbourhoods in data"
       />
       <QuickFilterChip
         label="Outcomes"
-        value={getValue("outcomes")}
+        value={getMulti("outcomes")}
         options={OUTCOME_QUICK_OPTIONS}
-        onChange={(v) => setValue("outcomes", v)}
+        onToggleMulti={(v) => toggleMulti("outcomes", v)}
+        onClearMulti={() => clearMulti("outcomes")}
       />
     </div>
   );

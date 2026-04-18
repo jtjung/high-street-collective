@@ -196,34 +196,41 @@ export function DashboardClient() {
     setPanelOpen(true);
   }, []);
 
-  const handleTypeClick = useCallback(
-    (type: string) => {
+  /** Toggle a value into/out of a string[] column filter. */
+  const toggleFilterValue = useCallback(
+    (id: string, value: string) => {
       setColumnFilters((prev) => {
-        const rest = prev.filter((f) => f.id !== "subtypes");
-        return [...rest, { id: "subtypes", value: type }];
+        const existing = prev.find((f) => f.id === id);
+        const current: string[] = existing
+          ? Array.isArray(existing.value)
+            ? (existing.value as string[])
+            : typeof existing.value === "string"
+              ? [existing.value]
+              : []
+          : [];
+        const next = current.includes(value)
+          ? current.filter((x) => x !== value)
+          : [...current, value];
+        const rest = prev.filter((f) => f.id !== id);
+        return next.length ? [...rest, { id, value: next }] : rest;
       });
     },
     [setColumnFilters]
+  );
+
+  const handleTypeClick = useCallback(
+    (type: string) => toggleFilterValue("subtypes", type),
+    [toggleFilterValue]
   );
 
   const handleAreaClick = useCallback(
-    (area: string) => {
-      setColumnFilters((prev) => {
-        const rest = prev.filter((f) => f.id !== "area");
-        return [...rest, { id: "area", value: area }];
-      });
-    },
-    [setColumnFilters]
+    (area: string) => toggleFilterValue("area", area),
+    [toggleFilterValue]
   );
 
   const handleNeighborhoodClick = useCallback(
-    (neighborhood: string) => {
-      setColumnFilters((prev) => {
-        const rest = prev.filter((f) => f.id !== "neighborhood");
-        return [...rest, { id: "neighborhood", value: neighborhood }];
-      });
-    },
-    [setColumnFilters]
+    (neighborhood: string) => toggleFilterValue("neighborhood", neighborhood),
+    [toggleFilterValue]
   );
 
 

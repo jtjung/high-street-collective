@@ -19,11 +19,24 @@ function matchesPresence(v: unknown, filter: string): boolean {
   return false;
 }
 
-function matchesOutcomes(outs: string[], filter: string): boolean {
-  if (filter === "__uncalled__") return outs.length === 0;
-  if (filter === "__any__") return outs.length > 0;
-  const needle = String(filter).toLowerCase();
-  return outs.some((o) => outcomeLabel(o).toLowerCase().includes(needle));
+/** Coerce a filter value to a non-empty string array, or null (= no filter). */
+function toStringArray(raw: unknown): string[] | null {
+  if (Array.isArray(raw)) {
+    const arr = raw.filter((x) => typeof x === "string" && x !== "") as string[];
+    return arr.length ? arr : null;
+  }
+  if (typeof raw === "string" && raw !== "" && raw !== "__all__") return [raw];
+  return null;
+}
+
+function matchesOutcomes(outs: string[], raw: unknown): boolean {
+  const values = toStringArray(raw);
+  if (!values) return true;
+  if (values.includes("__uncalled__")) return outs.length === 0;
+  if (values.includes("__any__")) return outs.length > 0;
+  return values.some((v) =>
+    outs.some((o) => outcomeLabel(o).toLowerCase().includes(v.toLowerCase()))
+  );
 }
 
 const NUMERIC_OP_RE = /^([<>=])(-?\d+(?:\.\d+)?)$/;
@@ -69,7 +82,8 @@ export function applyFilters(
     if (!matchesSearch(c, globalFilter)) return false;
 
     for (const f of columnFilters) {
-      const v = String(f.value ?? "");
+      const raw = f.value;
+      const v = String(raw ?? "");
       switch (f.id) {
         case "website":
           if (!matchesPresence(c.website, v)) return false;
@@ -78,31 +92,58 @@ export function applyFilters(
           if (!matchesPresence(c.email, v)) return false;
           break;
         case "outcomes":
-          if (!matchesOutcomes(c.outcomes ?? [], v)) return false;
+          if (!matchesOutcomes(c.outcomes ?? [], raw)) return false;
           break;
         case "subtypes": {
-          const subs = c.subtypes ?? [];
-          const needle = v.toLowerCase();
-          if (
-            !subs.some(
-              (s) => s.toLowerCase() === needle || s.toLowerCase().includes(needle)
+          const values = toStringArray(raw);
+          if (values) {
+            const subs = c.subtypes ?? [];
+            if (
+              !values.some((val) => {
+                const needle = val.toLowerCase();
+                return subs.some(
+                  (s) =>
+                    s.toLowerCase() === needle ||
+                    s.toLowerCase().includes(needle)
+                );
+              })
             )
-          )
-            return false;
+              return false;
+          }
           break;
         }
-        case "area":
-          if ((c.area ?? "").toLowerCase() !== v.toLowerCase()) return false;
+        case "area": {
+          const values = toStringArray(raw);
+          if (values) {
+            const area = (c.area ?? "").toLowerCase();
+            if (!values.some((val) => area === val.toLowerCase()))
+              return false;
+          }
           break;
-        case "neighborhood":
-          if ((c.neighborhood ?? "").toLowerCase() !== v.toLowerCase())
-            return false;
+        }
+        case "neighborhood": {
+          const values = toStringArray(raw);
+          if (values) {
+            const n = (c.neighborhood ?? "").toLowerCase();
+            if (!values.some((val) => n === val.toLowerCase()))
+              return false;
+          }
           break;
+        }
         case "postal_code": {
-          const pc = (c.postal_code ?? "").toUpperCase();
-          const target = v.toUpperCase();
-          const outward = outwardCode(pc);
-          if (outward !== target && !pc.startsWith(target)) return false;
+          const values = toStringArray(raw);
+          if (values) {
+            const pc = (c.postal_code ?? "").toUpperCase();
+            const outward = outwardCode(pc);
+            if (
+              !values.some(
+                (val) =>
+                  outward === val.toUpperCase() ||
+                  pc.startsWith(val.toUpperCase())
+              )
+            )
+              return false;
+          }
           break;
         }
         case "phone":
@@ -152,7 +193,9 @@ export function applyFilters(
           } else if (v === "__any__") {
             if (pts.length === 0) return false;
           } else if (
-            !pts.some((p) => painPointLabel(p).toLowerCase().includes(v.toLowerCase()))
+            !pts.some((p) =>
+              painPointLabel(p).toLowerCase().includes(v.toLowerCase())
+            )
           ) {
             return false;
           }
@@ -168,7 +211,9 @@ export function applyFilters(
           } else if (v === "__any__") {
             if (goals.length === 0) return false;
           } else if (
-            !goals.some((g) => userGoalLabel(g).toLowerCase().includes(v.toLowerCase()))
+            !goals.some((g) =>
+              userGoalLabel(g).toLowerCase().includes(v.toLowerCase())
+            )
           ) {
             return false;
           }
