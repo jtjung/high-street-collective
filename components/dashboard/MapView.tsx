@@ -98,7 +98,7 @@ function ClusterLayer({
         : "";
 
       m.bindTooltip(
-        `<div style="min-width:150px;">${headerHtml}${statusHtml}${hoursHtml}</div>`,
+        `<div style="min-width:150px;white-space:normal;">${headerHtml}${statusHtml}${hoursHtml}</div>`,
         { direction: "top", offset: [0, -8] }
       );
       m.on("click", (e) => {
