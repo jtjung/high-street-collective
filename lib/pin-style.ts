@@ -53,7 +53,7 @@ export function pinMarkerHtml(
       : "";
   const dot =
     opts.isOpen != null
-      ? `<div style="position:absolute;bottom:-2px;right:-2px;width:7px;height:7px;border-radius:50%;background:${opts.isOpen ? "#22c55e" : "#ef4444"};border:1.5px solid #fff;"></div>`
+      ? `<div style="position:absolute;bottom:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:${opts.isOpen ? "#22c55e" : "#ef4444"};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>`
       : "";
   return `<div style="position:relative;${base}">${label}${dot}</div>`;
 }

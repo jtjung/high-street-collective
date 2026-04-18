@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 
 const COLUMNS =
-  "id, name, subtypes, category, phone, email, address, street, city, postal_code, area, neighborhood, country_code, verified, rating, reviews, location_link, website, instagram, facebook, linkedin, x_twitter, youtube, working_hours, business_status, outcomes, callback_at, follow_up_method, not_interested_reason, outscraper_place_id, latitude, longitude";
+  "id, name, subtypes, category, phone, email, address, street, city, postal_code, area, neighborhood, country_code, verified, rating, reviews, location_link, website, instagram, facebook, linkedin, x_twitter, youtube, working_hours, business_status, outcomes, callback_at, follow_up_method, not_interested_reason, outscraper_place_id, latitude, longitude, prototype_url";
 
 const PAGE_SIZE = 1000; // Supabase PostgREST hard cap
 
@@ -59,11 +59,28 @@ export async function GET() {
     if (!contactMap.has(c.company_id)) contactMap.set(c.company_id, c);
   }
 
+  // Fetch campaign memberships per company
+  const { data: campaignMembers } = await supabase
+    .from("campaign_members")
+    .select("company_id, campaigns(id, name)")
+    .order("added_at", { ascending: true });
+
+  const campaignsMap = new Map<string, Array<{ id: string; name: string }>>();
+  for (const m of campaignMembers ?? []) {
+    const cm = m as { company_id: string; campaigns: { id: string; name: string } | null };
+    if (cm.campaigns) {
+      const list = campaignsMap.get(cm.company_id) ?? [];
+      list.push({ id: cm.campaigns.id, name: cm.campaigns.name });
+      campaignsMap.set(cm.company_id, list);
+    }
+  }
+
   const enriched = all.map((c) => ({
     ...c,
     last_reached_out: lastReachedMap.get(c.id as string) ?? null,
     latest_note_content: latestNoteContentMap.get(c.id as string) ?? null,
     contact: contactMap.get(c.id as string) ?? null,
+    campaigns: campaignsMap.get(c.id as string) ?? [],
   }));
 
   return NextResponse.json({ companies: enriched });

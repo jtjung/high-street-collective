@@ -9,10 +9,11 @@ export type Company = Tables<"companies"> & {
   last_reached_out: string | null;
   latest_note_content: string | null;
   contact: Contact | null;
+  campaigns: Array<{ id: string; name: string }>;
 };
 
 const CACHE_KEY = "hsc:companies";
-const CACHE_VERSION = "v8"; // contacts table + follow_up refactor
+const CACHE_VERSION = "v10"; // prototype_url + campaigns
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 
 type Cached = {

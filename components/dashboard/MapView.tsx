@@ -9,7 +9,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import type { Company } from "@/lib/use-companies";
 import { pinMarkerHtml } from "@/lib/pin-style";
-import { openStatusLabel, allHoursFormatted } from "@/lib/hours";
+import { openStatusLabel, allHoursFormatted, nextOpenLabel } from "@/lib/hours";
 import { Button } from "@/components/ui/button";
 
 type Props = {
@@ -84,9 +84,13 @@ function ClusterLayer({
       });
       const m = L.marker([c.latitude, c.longitude], { icon });
 
+      const nextOpen = nextOpenLabel(c.working_hours);
       const headerHtml = `<strong>${escapeHtml(c.name)}</strong>${c.postal_code ? ` · ${escapeHtml(c.postal_code)}` : ""}`;
       const statusHtml = status
         ? `<div style="font-size:11px;margin-top:3px;color:${status.open ? "#16a34a" : "#dc2626"};">● ${escapeHtml(status.label)}</div>`
+        : "";
+      const nextOpenHtml = nextOpen && !status?.open
+        ? `<div style="font-size:11px;margin-top:2px;color:#6b7280;">↗ ${escapeHtml(nextOpen)}</div>`
         : "";
       const hoursHtml = weekHours
         ? `<table style="margin-top:5px;border-collapse:collapse;font-size:10px;">${weekHours
@@ -98,7 +102,7 @@ function ClusterLayer({
         : "";
 
       m.bindTooltip(
-        `<div style="min-width:150px;white-space:normal;">${headerHtml}${statusHtml}${hoursHtml}</div>`,
+        `<div style="min-width:150px;white-space:normal;">${headerHtml}${statusHtml}${nextOpenHtml}${hoursHtml}</div>`,
         { direction: "top", offset: [0, -8] }
       );
       m.on("click", (e) => {
@@ -168,7 +172,7 @@ const LEGEND_ITEMS: Array<{ color: string; label: string }> = [
 function MapLegend() {
   const [open, setOpen] = useState(true);
   return (
-    <div className="absolute bottom-4 left-4 z-[1000] pointer-events-auto">
+    <div className="absolute top-4 right-4 z-[1000] pointer-events-auto">
       <div className="bg-card/95 backdrop-blur border rounded-md shadow-sm text-xs">
         <button
           onClick={() => setOpen((v) => !v)}

@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { companyName, phone, address, startTime: startTimeStr, durationMinutes, summary: customSummary, method, location } =
+  const { companyName, phone, address, startTime: startTimeStr, durationMinutes, summary: customSummary, method, location, notes: meetingNotes, contact } =
     (await request.json()) as {
       companyName: string;
       phone?: string | null;
@@ -21,6 +21,8 @@ export async function POST(request: Request) {
       summary?: string;
       method?: "in_person" | "email" | "phone" | null;
       location?: string | null;
+      notes?: Array<{ content: string; created_at: string; user_name?: string | null }>;
+      contact?: { name?: string | null; email?: string | null; phone?: string | null; notes?: string | null } | null;
     };
 
   if (!startTimeStr) {
@@ -73,18 +75,37 @@ export async function POST(request: Request) {
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
     const startTime = new Date(startTimeStr);
-    const endTime = addMinutes(startTime, durationMinutes ?? 15);
+    const endTime = addMinutes(startTime, durationMinutes ?? 30);
 
     const methodLabel =
       method === "in_person" ? "In person" :
       method === "email" ? "Email" :
       method === "phone" ? "Phone" : null;
-    const descriptionLines = [
+    const descriptionLines: string[] = [
       methodLabel ? `Method: ${methodLabel}` : null,
       location ? `Where: ${location}` : null,
       phone ? `Phone: ${phone}` : null,
       address ? `Address: ${address}` : null,
     ].filter(Boolean) as string[];
+
+    if (contact && (contact.name || contact.email || contact.phone || contact.notes)) {
+      descriptionLines.push("");
+      descriptionLines.push("Contact:");
+      if (contact.name) descriptionLines.push(`  Name: ${contact.name}`);
+      if (contact.email) descriptionLines.push(`  Email: ${contact.email}`);
+      if (contact.phone) descriptionLines.push(`  Phone: ${contact.phone}`);
+      if (contact.notes) descriptionLines.push(`  Notes: ${contact.notes}`);
+    }
+
+    if (meetingNotes && meetingNotes.length > 0) {
+      descriptionLines.push("");
+      descriptionLines.push("Meeting Notes:");
+      for (const n of meetingNotes) {
+        const when = new Date(n.created_at).toLocaleString("en-GB", { timeZone: "Europe/London" });
+        const who = n.user_name ? ` (${n.user_name})` : "";
+        descriptionLines.push(`  [${when}${who}] ${n.content}`);
+      }
+    }
 
     const event = {
       summary: customSummary ?? `Follow up: ${companyName}`,
@@ -162,7 +183,7 @@ export async function PATCH(request: Request) {
 
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
     const startTime = new Date(startTimeStr);
-    const endTime = addMinutes(startTime, durationMinutes ?? 15);
+    const endTime = addMinutes(startTime, durationMinutes ?? 30);
 
     const patch: Record<string, unknown> = {
       start: { dateTime: startTime.toISOString(), timeZone: "Europe/London" },

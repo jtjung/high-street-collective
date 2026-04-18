@@ -59,6 +59,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { outcomeLabel } from "@/lib/outcomes";
+import { nextOpenLabel } from "@/lib/hours";
 import type { Company } from "@/lib/use-companies";
 
 const OUTCOME_COLORS: Record<string, string> = {
@@ -96,7 +97,9 @@ const COLUMN_LABELS: Record<string, string> = {
   latest_note_content: "Latest Note",
   rating: "Rating",
   reviews: "Reviews",
-  contact_name: "Contact",
+  campaigns: "Campaigns",
+  next_open: "Next Open",
+  prototype_url: "Prototype",
 };
 
 /**
@@ -857,18 +860,60 @@ export function CompaniesTable({
         size: 80,
       },
       {
-        id: "contact_name",
-        accessorFn: (row) => row.contact?.name ?? null,
-        header: "Contact",
+        accessorKey: "prototype_url",
+        header: "Prototype",
         cell: ({ row }) => (
           <InlineEditCell
-            value={row.original.contact?.name ?? null}
-            onSave={(next) =>
-              saveContact(row.original.id, { name: next }, row.original.contact)
-            }
+            value={row.original.prototype_url ?? null}
+            inputType="url"
+            onSave={(next) => saveField(row.original.id, { prototype_url: next })}
           />
         ),
-        size: 160,
+        size: 180,
+        filterFn: (row, id, value) => {
+          const v = row.getValue(id) as string | null;
+          if (value === "__empty__") return !v;
+          if (value === "__nonempty__") return !!v;
+          return v ? v.toLowerCase().includes(String(value).toLowerCase()) : false;
+        },
+      },
+      {
+        id: "campaigns",
+        accessorFn: (row) => row.campaigns ?? [],
+        header: "Campaigns",
+        cell: ({ getValue }) => {
+          const camps = getValue() as Array<{ id: string; name: string }>;
+          if (!camps.length) return <span className="text-muted-foreground">—</span>;
+          return (
+            <div className="flex flex-wrap gap-0.5">
+              {camps.map((camp) => (
+                <a key={camp.id} href={`/campaigns/${camp.id}`} onClick={(e) => e.stopPropagation()}>
+                  <Badge variant="secondary" className="text-[10px] px-1 py-0 font-normal cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors">
+                    {camp.name}
+                  </Badge>
+                </a>
+              ))}
+            </div>
+          );
+        },
+        size: 180,
+        enableSorting: false,
+      },
+      {
+        id: "next_open",
+        accessorFn: (row) => nextOpenLabel(row.working_hours),
+        header: "Next Open",
+        cell: ({ getValue }) => {
+          const label = getValue() as string | null;
+          if (!label) return <span className="text-muted-foreground">—</span>;
+          const isOpen = label === "Open Now";
+          return (
+            <span className={`text-xs font-medium ${isOpen ? "text-green-600" : "text-muted-foreground"}`}>
+              {label}
+            </span>
+          );
+        },
+        size: 140,
         enableSorting: false,
       },
     ],

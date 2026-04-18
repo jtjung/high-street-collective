@@ -181,6 +181,7 @@ export type Database = {
           phone: string | null
           phone_carrier_type: string | null
           postal_code: string | null
+          prototype_url: string | null
           rating: number | null
           revenue: string | null
           reviews: number | null
@@ -229,6 +230,7 @@ export type Database = {
           phone?: string | null
           phone_carrier_type?: string | null
           postal_code?: string | null
+          prototype_url?: string | null
           rating?: number | null
           revenue?: string | null
           reviews?: number | null
@@ -277,6 +279,7 @@ export type Database = {
           phone?: string | null
           phone_carrier_type?: string | null
           postal_code?: string | null
+          prototype_url?: string | null
           rating?: number | null
           revenue?: string | null
           reviews?: number | null

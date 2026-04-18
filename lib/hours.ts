@@ -260,6 +260,50 @@ export function openStatusLabel(
 }
 
 /**
+ * Returns a concise "next open" label:
+ *   "Open Now" | "Today 12 PM" | "Tomorrow 10 AM" | "Fri 10 AM" | null
+ */
+export function nextOpenLabel(working_hours: unknown): string | null {
+  if (
+    !working_hours ||
+    typeof working_hours !== "object" ||
+    Array.isArray(working_hours)
+  )
+    return null;
+
+  const hours = working_hours as Record<string, unknown>;
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  if (isOpenNow(working_hours)) return "Open Now";
+
+  // Check if opens later today
+  const todayRaw = dayRaw(hours, DAY_NAMES[now.getDay()]);
+  for (const r of todayRaw) {
+    const parsed = parseHoursString(r);
+    if (!parsed || parsed.kind === "closed") continue;
+    if (parsed.kind === "open24") return "Open Now";
+    if (nowMinutes < parsed.openMinutes) {
+      return `Today ${formatMinutes(parsed.openMinutes)}`;
+    }
+  }
+
+  // Look ahead up to 7 days
+  for (let delta = 1; delta <= 7; delta++) {
+    const nextDay = (now.getDay() + delta) % 7;
+    const nextList = dayRaw(hours, DAY_NAMES[nextDay]);
+    for (const r of nextList) {
+      const parsed = parseHoursString(r);
+      if (!parsed || parsed.kind === "closed") continue;
+      const dayLabel = delta === 1 ? "Tomorrow" : DAY_NAMES_SHORT[nextDay];
+      if (parsed.kind === "open24") return dayLabel;
+      return `${dayLabel} ${formatMinutes(parsed.openMinutes)}`;
+    }
+  }
+  return null;
+}
+
+/**
  * Returns all 7 days formatted for display (Monday-first).
  * Returns null if no hours data exists.
  */

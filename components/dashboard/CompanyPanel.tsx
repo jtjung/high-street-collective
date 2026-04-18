@@ -346,6 +346,14 @@ export function CompanyPanel({
           location,
           method: followUpMethod || null,
           startTime: dt.toISOString(),
+          notes: notes.map((n) => ({
+            content: n.content,
+            created_at: n.created_at,
+            user_name: n.user_name,
+          })),
+          contact: contact
+            ? { name: contact.name, email: contact.email, phone: contact.phone, notes: contact.notes }
+            : null,
         }),
       });
 
@@ -538,6 +546,23 @@ export function CompanyPanel({
                 <span className="text-muted-foreground">{company.address}</span>
               </div>
             )}
+            {company.prototype_url && (
+              <div className="flex items-center gap-2">
+                <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+                <a
+                  href={
+                    company.prototype_url.startsWith("http")
+                      ? company.prototype_url
+                      : `https://${company.prototype_url}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline truncate text-sm"
+                >
+                  View Prototype
+                </a>
+              </div>
+            )}
             {company.rating && (
               <div className="flex items-center gap-2">
                 <Star className="h-4 w-4 text-yellow-500" />
@@ -691,17 +716,13 @@ export function CompanyPanel({
                   Method
                 </Label>
                 <Select
-                  value={followUpMethod || "__none__"}
-                  onValueChange={(v) => {
-                    const next = v === "__none__" ? "" : (v as FollowUpMethod);
-                    updateFollowUpMethod(next);
-                  }}
+                  value={followUpMethod || undefined}
+                  onValueChange={(v) => updateFollowUpMethod(v as FollowUpMethod)}
                 >
                   <SelectTrigger className="w-full text-sm">
-                    <SelectValue placeholder="Choose method..." />
+                    <SelectValue placeholder="Choose method…" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">—</SelectItem>
                     {FOLLOW_UP_METHODS.map((m) => (
                       <SelectItem key={m.value} value={m.value}>
                         {m.label}
@@ -709,6 +730,15 @@ export function CompanyPanel({
                     ))}
                   </SelectContent>
                 </Select>
+                {followUpMethod && (
+                  <button
+                    type="button"
+                    onClick={() => updateFollowUpMethod("")}
+                    className="text-[10px] text-muted-foreground hover:text-destructive mt-0.5"
+                  >
+                    Clear
+                  </button>
+                )}
                 {followUpMethod && (
                   <p className="text-[10px] text-muted-foreground mt-1">
                     {followUpMethod === "in_person"
@@ -840,6 +870,30 @@ export function CompanyPanel({
                 className="text-sm"
               />
             </div>
+          </div>
+
+          {/* Prototype URL */}
+          <div>
+            <Label className="text-sm font-semibold mb-2 block">Prototype</Label>
+            <Input
+              type="url"
+              defaultValue={company.prototype_url ?? ""}
+              onBlur={(e) => {
+                const v = e.target.value.trim() || null;
+                if (v === (company.prototype_url ?? null)) return;
+                fetch(`/api/companies/${company.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ prototype_url: v }),
+                }).then(async (res) => {
+                  if (!res.ok) throw new Error("Failed");
+                  onUpdated(company.id, { prototype_url: v });
+                }).catch(() => toast.error("Failed to save prototype URL"));
+              }}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              placeholder="https://..."
+              className="h-8 text-sm"
+            />
           </div>
 
           <Separator />

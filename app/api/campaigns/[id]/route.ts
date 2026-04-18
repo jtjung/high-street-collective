@@ -3,7 +3,7 @@ import { getAuth } from "@/lib/get-auth";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 
 const MEMBER_COMPANY_COLUMNS =
-  "id, name, subtypes, phone, email, address, postal_code, area, neighborhood, website, rating, reviews, verified, outcomes";
+  "id, name, subtypes, phone, email, address, postal_code, area, neighborhood, website, rating, reviews, verified, outcomes, latitude, longitude, location_link, prototype_url";
 
 export async function GET(
   _request: Request,
