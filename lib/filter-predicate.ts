@@ -26,6 +26,30 @@ function matchesOutcomes(outs: string[], filter: string): boolean {
   return outs.some((o) => outcomeLabel(o).toLowerCase().includes(needle));
 }
 
+const NUMERIC_OP_RE = /^([<>=])(-?\d+(?:\.\d+)?)$/;
+
+/** Apply a numeric comparison filter like "<5", ">10", "=3". */
+function matchesNumericOp(
+  v: number | null | undefined,
+  filter: string
+): boolean {
+  const m = filter.match(NUMERIC_OP_RE);
+  if (!m) return true; // unrecognized → don't filter
+  const n = Number(m[2]);
+  if (!Number.isFinite(n)) return true;
+  const value = (v as number) ?? 0;
+  if (m[1] === "<") return value < n;
+  if (m[1] === ">") return value > n;
+  return value === n;
+}
+
+function outwardCode(pc: string | null | undefined): string | null {
+  if (!pc) return null;
+  const trimmed = pc.trim().toUpperCase();
+  if (!trimmed) return null;
+  return trimmed.split(/\s+/)[0] ?? null;
+}
+
 /**
  * Shared filter predicate — the single source of truth for what rows a given
  * `columnFilters` + `globalFilter` combination selects. Used by both the
@@ -58,7 +82,12 @@ export function applyFilters(
           break;
         case "subtypes": {
           const subs = c.subtypes ?? [];
-          if (!subs.some((s) => s.toLowerCase().includes(v.toLowerCase())))
+          const needle = v.toLowerCase();
+          if (
+            !subs.some(
+              (s) => s.toLowerCase() === needle || s.toLowerCase().includes(needle)
+            )
+          )
             return false;
           break;
         }
@@ -71,7 +100,9 @@ export function applyFilters(
           break;
         case "postal_code": {
           const pc = (c.postal_code ?? "").toUpperCase();
-          if (!pc.startsWith(v.toUpperCase())) return false;
+          const target = v.toUpperCase();
+          const outward = outwardCode(pc);
+          if (outward !== target && !pc.startsWith(target)) return false;
           break;
         }
         case "phone":
@@ -81,17 +112,14 @@ export function applyFilters(
           if (v === "true" && !c.verified) return false;
           if (v === "false" && c.verified) return false;
           break;
-        case "call_count": {
-          const count = (c.call_count as number) ?? 0;
-          if (v === "__any__" && count === 0) return false;
-          if (v === "__zero__" && count > 0) return false;
+        case "call_count":
+          if (!matchesNumericOp(c.call_count as number | null, v)) return false;
           break;
-        }
         case "rating":
-          if (!matchesPresence(c.rating, v)) return false;
+          if (!matchesNumericOp(c.rating as number | null, v)) return false;
           break;
         case "reviews":
-          if (!matchesPresence(c.reviews, v)) return false;
+          if (!matchesNumericOp(c.reviews as number | null, v)) return false;
           break;
         case "last_reached_out":
           if (!matchesPresence(c.last_reached_out, v)) return false;
@@ -113,7 +141,15 @@ export function applyFilters(
           break;
         case "pain_points": {
           const pts = (c.pain_points as string[]) ?? [];
-          if (!pts.some((p) => painPointLabel(p).toLowerCase().includes(v.toLowerCase()))) return false;
+          if (v === "__none__") {
+            if (pts.length !== 0) return false;
+          } else if (v === "__any__") {
+            if (pts.length === 0) return false;
+          } else if (
+            !pts.some((p) => painPointLabel(p).toLowerCase().includes(v.toLowerCase()))
+          ) {
+            return false;
+          }
           break;
         }
         case "latest_note_content":
@@ -121,7 +157,15 @@ export function applyFilters(
           break;
         case "user_goals": {
           const goals = (c.user_goals as string[]) ?? [];
-          if (!goals.some((g) => userGoalLabel(g).toLowerCase().includes(v.toLowerCase()))) return false;
+          if (v === "__none__") {
+            if (goals.length !== 0) return false;
+          } else if (v === "__any__") {
+            if (goals.length === 0) return false;
+          } else if (
+            !goals.some((g) => userGoalLabel(g).toLowerCase().includes(v.toLowerCase()))
+          ) {
+            return false;
+          }
           break;
         }
         default:

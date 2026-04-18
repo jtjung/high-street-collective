@@ -59,7 +59,14 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { outcomeLabel, painPointLabel, userGoalLabel, OUTCOME_OPTIONS } from "@/lib/outcomes";
+import {
+  outcomeLabel,
+  painPointLabel,
+  userGoalLabel,
+  OUTCOME_OPTIONS,
+  PAIN_POINTS,
+  USER_GOALS,
+} from "@/lib/outcomes";
 import type { Company } from "@/lib/use-companies";
 
 const OUTCOME_COLORS: Record<string, string> = {
@@ -108,8 +115,22 @@ const COLUMN_LABELS: Record<string, string> = {
 
 type FilterConfig =
   | { type: "select"; options: { value: string; label: string }[] }
+  | { type: "numeric" }
   | { type: "text" };
 
+// Columns whose options are driven purely by the data (distinct-value dropdowns).
+const DISTINCT_COLUMNS = new Set([
+  "area",
+  "neighborhood",
+  "subtypes",
+  "postal_code",
+]);
+
+// Columns that accept numeric comparison filters: `<N`, `>N`, `=N`.
+const NUMERIC_COLUMNS = new Set(["call_count", "rating", "reviews"]);
+
+// Static (non-data-driven) filter shapes. Distinct/numeric columns are handled
+// separately and should NOT appear here.
 const COLUMN_FILTER_CONFIGS: Partial<Record<string, FilterConfig>> = {
   verified: {
     type: "select",
@@ -168,31 +189,58 @@ const COLUMN_FILTER_CONFIGS: Partial<Record<string, FilterConfig>> = {
       { value: "__empty__", label: "No callback" },
     ],
   },
-  call_count: {
+  pain_points: {
     type: "select",
     options: [
       { value: "__all__", label: "All" },
-      { value: "__any__", label: "Has calls (> 0)" },
-      { value: "__zero__", label: "No calls" },
+      { value: "__none__", label: "None set" },
+      { value: "__any__", label: "Any set" },
+      ...PAIN_POINTS.map((p) => ({ value: p.label, label: p.label })),
     ],
   },
-  rating: {
+  user_goals: {
     type: "select",
     options: [
       { value: "__all__", label: "All" },
-      { value: "__nonempty__", label: "Has rating" },
-      { value: "__empty__", label: "No rating" },
-    ],
-  },
-  reviews: {
-    type: "select",
-    options: [
-      { value: "__all__", label: "All" },
-      { value: "__nonempty__", label: "Has reviews" },
-      { value: "__empty__", label: "No reviews" },
+      { value: "__none__", label: "None set" },
+      { value: "__any__", label: "Any set" },
+      ...USER_GOALS.map((g) => ({ value: g.label, label: g.label })),
     ],
   },
 };
+
+/** UK outward code — the token before the space in a postal code. */
+function outwardCode(pc: string | null | undefined): string | null {
+  if (!pc) return null;
+  const trimmed = pc.trim().toUpperCase();
+  if (!trimmed) return null;
+  const parts = trimmed.split(/\s+/);
+  return parts[0] ?? null;
+}
+
+const NUMERIC_OP_RE = /^([<>=])(-?\d+(?:\.\d+)?)$/;
+
+/** Parse a numeric filter value like "<5", ">10", "=3". Returns null if blank or invalid. */
+function parseNumericOp(
+  raw: unknown
+): { op: "<" | ">" | "="; n: number } | null {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
+  const m = s.match(NUMERIC_OP_RE);
+  if (!m) return null;
+  const n = Number(m[2]);
+  if (!Number.isFinite(n)) return null;
+  return { op: m[1] as "<" | ">" | "=", n };
+}
+
+function applyNumericOp(value: number | null | undefined, raw: unknown): boolean {
+  const parsed = parseNumericOp(raw);
+  if (!parsed) return true; // no / invalid filter → don't filter
+  const v = (value as number) ?? 0;
+  if (parsed.op === "<") return v < parsed.n;
+  if (parsed.op === ">") return v > parsed.n;
+  return v === parsed.n;
+}
 
 function useLocalStorageState<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(() => {
@@ -367,6 +415,10 @@ export function CompaniesTable({
           );
         },
         size: 140,
+        filterFn: (row, id, value) => {
+          const v = (row.getValue(id) as string | null) ?? "";
+          return v.toLowerCase() === String(value).toLowerCase();
+        },
       },
       {
         accessorKey: "neighborhood",
@@ -383,6 +435,10 @@ export function CompaniesTable({
           );
         },
         size: 160,
+        filterFn: (row, id, value) => {
+          const v = (row.getValue(id) as string | null) ?? "";
+          return v.toLowerCase() === String(value).toLowerCase();
+        },
       },
       {
         accessorKey: "postal_code",
@@ -393,6 +449,14 @@ export function CompaniesTable({
           </span>
         ),
         size: 90,
+        filterFn: (row, id, value) => {
+          const pc = String(row.getValue(id) ?? "").toUpperCase();
+          const target = String(value).toUpperCase();
+          if (!target) return true;
+          const outward = outwardCode(pc);
+          // Match on outward code (dropdown selection) OR prefix (typed text).
+          return outward === target || pc.startsWith(target);
+        },
       },
       {
         accessorKey: "subtypes",
@@ -431,8 +495,11 @@ export function CompaniesTable({
         size: 150,
         filterFn: (row, id, value) => {
           const subs = (row.getValue(id) as string[] | null) ?? [];
-          return subs.some((s) =>
-            s.toLowerCase().includes(String(value).toLowerCase())
+          const v = String(value).toLowerCase();
+          // Exact match for dropdown selections; substring match as fallback
+          // (so text-typed filters from elsewhere still work).
+          return subs.some(
+            (s) => s.toLowerCase() === v || s.toLowerCase().includes(v)
           );
         },
       },
@@ -756,6 +823,8 @@ export function CompaniesTable({
         enableSorting: false,
         filterFn: (row, id, value) => {
           const pts = (row.getValue(id) as string[] | null) ?? [];
+          if (value === "__none__") return pts.length === 0;
+          if (value === "__any__") return pts.length > 0;
           return pts.some((p) =>
             painPointLabel(p).toLowerCase().includes(String(value).toLowerCase())
           );
@@ -785,12 +854,8 @@ export function CompaniesTable({
           return <span className="text-xs font-mono">{count || "—"}</span>;
         },
         size: 60,
-        filterFn: (row, id, value) => {
-          const n = (row.getValue(id) as number) ?? 0;
-          if (value === "__any__") return n > 0;
-          if (value === "__zero__") return n === 0;
-          return true;
-        },
+        filterFn: (row, id, value) =>
+          applyNumericOp(row.getValue(id) as number | null, value),
       },
       {
         accessorKey: "rating",
@@ -805,12 +870,8 @@ export function CompaniesTable({
           );
         },
         size: 70,
-        filterFn: (row, id, value) => {
-          const r = row.getValue(id) as number | null;
-          if (value === "__empty__") return !r;
-          if (value === "__nonempty__") return !!r;
-          return true;
-        },
+        filterFn: (row, id, value) =>
+          applyNumericOp(row.getValue(id) as number | null, value),
       },
       {
         accessorKey: "reviews",
@@ -821,12 +882,8 @@ export function CompaniesTable({
           return <span className="text-xs">{n.toLocaleString()}</span>;
         },
         size: 80,
-        filterFn: (row, id, value) => {
-          const n = row.getValue(id) as number | null;
-          if (value === "__empty__") return !n;
-          if (value === "__nonempty__") return !!n;
-          return true;
-        },
+        filterFn: (row, id, value) =>
+          applyNumericOp(row.getValue(id) as number | null, value),
       },
       {
         accessorKey: "manager_name",
@@ -868,14 +925,36 @@ export function CompaniesTable({
         enableSorting: false,
         filterFn: (row, id, value) => {
           const goals = (row.getValue(id) as string[] | null) ?? [];
+          if (value === "__none__") return goals.length === 0;
+          if (value === "__any__") return goals.length > 0;
           return goals.some((g) =>
             userGoalLabel(g).toLowerCase().includes(String(value).toLowerCase())
           );
         },
       },
     ],
-    [onPhoneClick, onTypeClick]
+    [onPhoneClick, onTypeClick, onAreaClick, onNeighborhoodClick]
   );
+
+  // Distinct-value option lists pulled from the current dataset. Used by the
+  // Filter popover to turn chip/category columns into data-driven dropdowns.
+  const distinctOptions = useMemo(() => {
+    const uniq = (xs: (string | null | undefined)[]) => {
+      const set = new Set<string>();
+      for (const x of xs) {
+        if (!x) continue;
+        const s = String(x).trim();
+        if (s) set.add(s);
+      }
+      return Array.from(set).sort((a, b) => a.localeCompare(b));
+    };
+    return {
+      area: uniq(companies.map((c) => c.area)),
+      neighborhood: uniq(companies.map((c) => c.neighborhood)),
+      subtypes: uniq(companies.flatMap((c) => c.subtypes ?? [])),
+      postal_code: uniq(companies.map((c) => outwardCode(c.postal_code))),
+    } satisfies Record<string, string[]>;
+  }, [companies]);
 
   const globalFilterFn = useMemo(
     () =>
@@ -1136,43 +1215,81 @@ export function CompaniesTable({
                     .getAllLeafColumns()
                     .filter((c) => c.getIsVisible() && c.getCanFilter())
                     .map((column) => {
-                      const config = COLUMN_FILTER_CONFIGS[column.id];
+                      const staticConfig = COLUMN_FILTER_CONFIGS[column.id];
                       const value = column.getFilterValue();
                       const label = COLUMN_LABELS[column.id] ?? column.id;
-                      return (
-                        <div key={column.id} className="space-y-1">
-                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                            {label}
-                          </p>
-                          {config?.type === "select" ? (
+
+                      // Resolve the filter shape in priority order:
+                      //   1. Data-driven distinct dropdown (area/neighborhood/subtypes/postal_code)
+                      //   2. Numeric operator (call_count/rating/reviews)
+                      //   3. Static select config
+                      //   4. Plain text input
+                      let body: React.ReactNode;
+                      if (DISTINCT_COLUMNS.has(column.id)) {
+                        const opts =
+                          distinctOptions[
+                            column.id as keyof typeof distinctOptions
+                          ] ?? [];
+                        body = (
+                          <Select
+                            value={(value as string) ?? "__all__"}
+                            onValueChange={(v) =>
+                              column.setFilterValue(v === "__all__" ? undefined : v)
+                            }
+                          >
+                            <SelectTrigger className="h-7 text-xs">
+                              <SelectValue placeholder="Any" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-72">
+                              <SelectItem value="__all__">Any</SelectItem>
+                              {opts.map((opt) => (
+                                <SelectItem key={opt} value={opt}>
+                                  {opt}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      } else if (NUMERIC_COLUMNS.has(column.id)) {
+                        const parsed = parseNumericOp(value);
+                        const currentOp = parsed?.op ?? ">";
+                        const currentN = parsed ? String(parsed.n) : "";
+                        const commitNumeric = (op: string, n: string) => {
+                          if (!n.trim()) {
+                            column.setFilterValue(undefined);
+                            return;
+                          }
+                          column.setFilterValue(`${op}${n.trim()}`);
+                        };
+                        body = (
+                          <div className="flex items-center gap-1">
                             <Select
-                              value={(value as string) ?? "__all__"}
+                              value={currentOp}
                               onValueChange={(v) =>
-                                column.setFilterValue(v === "__all__" ? undefined : v)
+                                commitNumeric(v ?? ">", currentN)
                               }
                             >
-                              <SelectTrigger className="h-7 text-xs">
+                              <SelectTrigger className="h-7 w-14 text-xs">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {config.options.map((opt) => (
-                                  <SelectItem key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
+                                <SelectItem value="<">&lt;</SelectItem>
+                                <SelectItem value=">">&gt;</SelectItem>
+                                <SelectItem value="=">=</SelectItem>
                               </SelectContent>
                             </Select>
-                          ) : (
-                            <div className="relative">
+                            <div className="relative flex-1">
                               <Input
-                                value={(value as string) ?? ""}
+                                type="number"
+                                step="any"
+                                value={currentN}
                                 onChange={(e) =>
-                                  column.setFilterValue(e.target.value || undefined)
+                                  commitNumeric(currentOp, e.target.value)
                                 }
-                                placeholder="Filter..."
+                                placeholder="Number"
                                 className="h-7 text-xs pr-7"
                               />
-                              {!!value && (
+                              {currentN !== "" && (
                                 <button
                                   onClick={() => column.setFilterValue(undefined)}
                                   className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
@@ -1181,7 +1298,57 @@ export function CompaniesTable({
                                 </button>
                               )}
                             </div>
-                          )}
+                          </div>
+                        );
+                      } else if (staticConfig?.type === "select") {
+                        body = (
+                          <Select
+                            value={(value as string) ?? "__all__"}
+                            onValueChange={(v) =>
+                              column.setFilterValue(v === "__all__" ? undefined : v)
+                            }
+                          >
+                            <SelectTrigger className="h-7 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {staticConfig.options.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      } else {
+                        body = (
+                          <div className="relative">
+                            <Input
+                              value={(value as string) ?? ""}
+                              onChange={(e) =>
+                                column.setFilterValue(e.target.value || undefined)
+                              }
+                              placeholder="Filter..."
+                              className="h-7 text-xs pr-7"
+                            />
+                            {!!value && (
+                              <button
+                                onClick={() => column.setFilterValue(undefined)}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={column.id} className="space-y-1">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            {label}
+                          </p>
+                          {body}
                         </div>
                       );
                     })}
