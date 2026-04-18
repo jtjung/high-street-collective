@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 
 const COMPANY_COLUMNS =
-  "id, name, subtypes, category, phone, email, address, street, city, postal_code, area, neighborhood, website, instagram, facebook, linkedin, rating, reviews, location_link, verified, outcomes, pain_points, user_goals, contact_name, contact_address, contact_method, contact_notes";
+  "id, name, subtypes, category, phone, email, address, street, city, postal_code, area, neighborhood, website, instagram, facebook, linkedin, rating, reviews, location_link, verified, outcomes";
 
 export async function GET() {
   const { userId } = await getAuth();
@@ -18,7 +18,35 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ opportunities: data ?? [] });
+  type OppRow = {
+    company: { id: string } & Record<string, unknown> | null;
+  };
+  const companyIds = (data as OppRow[] | null ?? [])
+    .map((o) => o.company?.id)
+    .filter((v: string | undefined): v is string => !!v);
+
+  const contactMap = new Map<string, { name: string | null; email: string | null; phone: string | null }>();
+  if (companyIds.length > 0) {
+    const { data: contacts } = await supabase
+      .from("contacts")
+      .select("company_id, name, email, phone, created_at")
+      .in("company_id", companyIds)
+      .order("created_at", { ascending: true });
+    for (const c of contacts ?? []) {
+      if (!contactMap.has(c.company_id)) {
+        contactMap.set(c.company_id, { name: c.name, email: c.email, phone: c.phone });
+      }
+    }
+  }
+
+  const enriched = (data as OppRow[] | null ?? []).map((o) => ({
+    ...o,
+    company: o.company
+      ? { ...o.company, contact: contactMap.get(o.company.id) ?? null }
+      : null,
+  }));
+
+  return NextResponse.json({ opportunities: enriched });
 }
 
 export async function POST(request: Request) {

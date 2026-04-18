@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "vercel --prod 2>&1",
+            "timeout": 300,
+            "statusMessage": "Deploying to production..."
+          }
+        ]
+      }
+    ]
+  }
+}

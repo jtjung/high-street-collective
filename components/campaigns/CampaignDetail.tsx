@@ -20,11 +20,16 @@ import {
   Loader2,
 } from "lucide-react";
 import { NavTabs } from "@/components/NavTabs";
-import { Badge } from "@/components/ui/badge";
 import type { Tables } from "@/lib/supabase/types";
 import { useRouter } from "next/navigation";
 
 type Campaign = Tables<"campaigns">;
+
+type ContactLite = {
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+};
 
 type MemberCompany = Pick<
   Tables<"companies">,
@@ -42,10 +47,9 @@ type MemberCompany = Pick<
   | "reviews"
   | "verified"
   | "outcomes"
-  | "contact_name"
-  | "contact_address"
-  | "contact_method"
->;
+> & {
+  contact: ContactLite | null;
+};
 
 type Member = {
   added_at: string;
@@ -280,20 +284,9 @@ export function CampaignDetail({ id }: { id: string }) {
                             )}
                           </td>
                           <td className="px-3 py-2 hidden sm:table-cell">
-                            {company.contact_name ? (
-                              <div>
-                                <div className="truncate max-w-[180px]">
-                                  {company.contact_name}
-                                </div>
-                                {company.contact_method && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-[10px] mt-0.5"
-                                  >
-                                    {METHOD_LABELS[company.contact_method] ??
-                                      company.contact_method}
-                                  </Badge>
-                                )}
+                            {company.contact?.name ? (
+                              <div className="truncate max-w-[180px]">
+                                {company.contact.name}
                               </div>
                             ) : (
                               <span className="text-muted-foreground">—</span>

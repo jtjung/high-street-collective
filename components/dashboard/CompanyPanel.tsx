@@ -25,26 +25,23 @@ import {
   Clock,
   ExternalLink,
   Globe,
-  History,
   Keyboard,
   Loader2,
   Mail,
   MapPin,
   Phone,
   Star,
-  X,
 } from "lucide-react";
 import { openStatusLabel, allHoursFormatted } from "@/lib/hours";
 import { toast } from "sonner";
 import {
   OUTCOME_OPTIONS,
   NOT_INTERESTED_REASONS,
-  PAIN_POINTS,
-  USER_GOALS,
+  FOLLOW_UP_METHODS,
+  type FollowUpMethod,
 } from "@/lib/outcomes";
 import { Input } from "@/components/ui/input";
-import { useCallHistory } from "@/lib/call-history";
-import type { Company } from "@/lib/use-companies";
+import type { Company, Contact } from "@/lib/use-companies";
 import type { Tables } from "@/lib/supabase/types";
 
 type Note = Tables<"company_notes">;
@@ -82,12 +79,6 @@ export function CompanyPanel({
   onUpdated,
 }: CompanyPanelProps) {
   const { user } = useUser();
-  const {
-    history: callHistory,
-    loading: callHistoryLoading,
-    log: logCall,
-    remove: removeCall,
-  } = useCallHistory(company?.id ?? null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteInput, setNoteInput] = useState("");
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -98,13 +89,13 @@ export function CompanyPanel({
   const [notInterestedReason, setNotInterestedReason] = useState<string | null>(
     null
   );
-  const [painPoints, setPainPoints] = useState<string[]>([]);
-  const [userGoals, setUserGoals] = useState<string[]>([]);
+  const [contact, setContact] = useState<Contact | null>(null);
   const [contactName, setContactName] = useState<string>("");
-  const [contactAddress, setContactAddress] = useState<string>("");
-  const [contactMethod, setContactMethod] = useState<string>("");
+  const [contactEmail, setContactEmail] = useState<string>("");
+  const [contactPhone, setContactPhone] = useState<string>("");
   const [contactNotes, setContactNotes] = useState<string>("");
 
+  const [followUpMethod, setFollowUpMethod] = useState<FollowUpMethod | "">("");
   const [callbackDate, setCallbackDate] = useState<Date | undefined>();
   const [callbackTime, setCallbackTime] = useState<string>("10:00");
   const [schedulingCallback, setSchedulingCallback] = useState(false);
@@ -115,13 +106,13 @@ export function CompanyPanel({
   useEffect(() => {
     if (!company) return;
     setOutcomes(company.outcomes ?? []);
-    setPainPoints(company.pain_points ?? []);
-    setUserGoals(company.user_goals ?? []);
-    setContactName(company.contact_name ?? "");
-    setContactAddress(company.contact_address ?? "");
-    setContactMethod(company.contact_method ?? "");
-    setContactNotes(company.contact_notes ?? "");
+    setContact(company.contact ?? null);
+    setContactName(company.contact?.name ?? "");
+    setContactEmail(company.contact?.email ?? "");
+    setContactPhone(company.contact?.phone ?? "");
+    setContactNotes(company.contact?.notes ?? "");
     setNotInterestedReason(company.not_interested_reason ?? null);
+    setFollowUpMethod((company.follow_up_method as FollowUpMethod) ?? "");
     setNoteInput("");
     if (company.callback_at) {
       const d = new Date(company.callback_at);
@@ -235,71 +226,36 @@ export function CompanyPanel({
     [company, outcomes, onUpdated]
   );
 
-  const togglePainPoint = useCallback(
-    async (value: string) => {
+  const saveContactField = useCallback(
+    async (next: {
+      name?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      notes?: string | null;
+    }) => {
       if (!company) return;
-      const next = painPoints.includes(value)
-        ? painPoints.filter((p) => p !== value)
-        : [...painPoints, value];
-      setPainPoints(next);
+      const payload = {
+        name: contact?.name ?? null,
+        email: contact?.email ?? null,
+        phone: contact?.phone ?? null,
+        notes: contact?.notes ?? null,
+        ...next,
+      };
       try {
-        const res = await fetch(`/api/companies/${company.id}`, {
-          method: "PATCH",
+        const res = await fetch(`/api/companies/${company.id}/contact`, {
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pain_points: next }),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error("Failed");
-        onUpdated(company.id, { pain_points: next });
+        const saved = (await res.json()) as Contact;
+        setContact(saved);
+        onUpdated(company.id, { contact: saved });
       } catch {
-        toast.error("Failed to save pain points");
-        setPainPoints(painPoints);
+        toast.error("Failed to save contact");
       }
     },
-    [company, painPoints, onUpdated]
-  );
-
-  const toggleUserGoal = useCallback(
-    async (value: string) => {
-      if (!company) return;
-      const next = userGoals.includes(value)
-        ? userGoals.filter((g) => g !== value)
-        : [...userGoals, value];
-      setUserGoals(next);
-      try {
-        const res = await fetch(`/api/companies/${company.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_goals: next }),
-        });
-        if (!res.ok) throw new Error("Failed");
-        onUpdated(company.id, { user_goals: next });
-      } catch {
-        toast.error("Failed to save goals");
-        setUserGoals(userGoals);
-      }
-    },
-    [company, userGoals, onUpdated]
-  );
-
-  const saveTextField = useCallback(
-    async (
-      field: "contact_name" | "contact_address" | "contact_method" | "contact_notes",
-      value: string
-    ) => {
-      if (!company) return;
-      try {
-        const res = await fetch(`/api/companies/${company.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ [field]: value || null }),
-        });
-        if (!res.ok) throw new Error("Failed");
-        onUpdated(company.id, { [field]: value || null });
-      } catch {
-        toast.error("Failed to save");
-      }
-    },
-    [company, onUpdated]
+    [company, contact, onUpdated]
   );
 
   const updateReason = async (value: string) => {
@@ -318,6 +274,54 @@ export function CompanyPanel({
     }
   };
 
+  const updateFollowUpMethod = async (value: FollowUpMethod | "") => {
+    if (!company) return;
+    setFollowUpMethod(value);
+    try {
+      const res = await fetch(`/api/companies/${company.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ follow_up_method: value || null }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      onUpdated(company.id, { follow_up_method: value || null });
+    } catch {
+      toast.error("Failed to save method");
+    }
+  };
+
+  /**
+   * Compute the calendar event location + description fields from the
+   * selected follow-up method. If in-person → business address;
+   * if email → contact email; if phone → contact phone.
+   */
+  const computeCalendarFields = () => {
+    if (!company)
+      return { location: null, phone: null, address: null };
+    if (followUpMethod === "in_person") {
+      return {
+        location: company.address ?? null,
+        phone: null,
+        address: company.address ?? null,
+      };
+    }
+    if (followUpMethod === "email") {
+      return {
+        location: contactEmail || contact?.email || company.email || null,
+        phone: null,
+        address: null,
+      };
+    }
+    if (followUpMethod === "phone") {
+      return {
+        location: contactPhone || contact?.phone || company.phone || null,
+        phone: contactPhone || contact?.phone || company.phone || null,
+        address: null,
+      };
+    }
+    return { location: null, phone: company.phone, address: company.address };
+  };
+
   const scheduleCallback = async () => {
     if (!company || !callbackDate) return;
     setSchedulingCallback(true);
@@ -329,14 +333,18 @@ export function CompanyPanel({
       const existingEventId = company.calendar_event_id;
       const isUpdate = !!existingEventId;
 
+      const { location, phone, address } = computeCalendarFields();
+
       const calRes = await fetch("/api/calendar/event", {
         method: isUpdate ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...(isUpdate ? { eventId: existingEventId } : {}),
           companyName: company.name,
-          phone: company.phone,
-          address: company.address,
+          phone,
+          address,
+          location,
+          method: followUpMethod || null,
           startTime: dt.toISOString(),
         }),
       });
@@ -358,8 +366,8 @@ export function CompanyPanel({
       });
       if (!res.ok) throw new Error("Failed");
 
-      if (!outcomes.includes("call_back_later")) {
-        const newOutcomes = [...outcomes, "call_back_later"];
+      if (!outcomes.includes("follow_up")) {
+        const newOutcomes = [...outcomes, "follow_up"];
         await fetch(`/api/companies/${company.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -374,14 +382,14 @@ export function CompanyPanel({
       toast.success(
         calendarEventId
           ? isUpdate
-            ? "Callback updated + calendar invite sent"
-            : "Callback scheduled + calendar invite sent"
+            ? "Follow up updated + calendar invite sent"
+            : "Follow up scheduled + calendar invite sent"
           : isUpdate
-            ? "Callback updated"
-            : "Callback scheduled"
+            ? "Follow up updated"
+            : "Follow up scheduled"
       );
     } catch {
-      toast.error("Failed to schedule callback");
+      toast.error("Failed to schedule follow up");
     } finally {
       setSchedulingCallback(false);
     }
@@ -407,7 +415,7 @@ export function CompanyPanel({
       });
       if (!res.ok) throw new Error("Failed");
 
-      const newOutcomes = outcomes.filter((o) => o !== "call_back_later");
+      const newOutcomes = outcomes.filter((o) => o !== "follow_up");
       if (newOutcomes.length !== outcomes.length) {
         await fetch(`/api/companies/${company.id}`, {
           method: "PATCH",
@@ -422,15 +430,15 @@ export function CompanyPanel({
 
       setCallbackDate(undefined);
       setCallbackTime("10:00");
-      toast.success("Callback cancelled");
+      toast.success("Follow up cancelled");
     } catch {
-      toast.error("Failed to cancel callback");
+      toast.error("Failed to cancel follow up");
     } finally {
       setCancellingCallback(false);
     }
   };
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts for outcomes
   useEffect(() => {
     if (!open || !company) return;
     const handler = (e: KeyboardEvent) => {
@@ -440,34 +448,25 @@ export function CompanyPanel({
       // Let Cmd+Z pass through to the global undo handler — don't intercept it here
       if (e.key.toLowerCase() === "z") return;
 
-      // Outcomes: Cmd+1..6
       const outcome = OUTCOME_OPTIONS.find((o) => o.shortcut === e.key);
       if (outcome) {
         e.preventDefault();
         toggleOutcome(outcome.value);
         return;
       }
-
-      // Pain points: Cmd+letter
-      const pain = PAIN_POINTS.find(
-        (p) => p.shortcut.toLowerCase() === e.key.toLowerCase()
-      );
-      if (pain) {
-        e.preventDefault();
-        togglePainPoint(pain.value);
-      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, company, toggleOutcome, togglePainPoint]);
+  }, [open, company, toggleOutcome]);
 
   if (!company) return null;
 
   const showReasonDropdown = outcomes.includes("not_interested");
+  const showFollowUp = outcomes.includes("follow_up");
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full max-w-full sm:max-w-[540px] md:max-w-[720px] lg:max-w-[960px] lg:min-w-[960px] p-0 flex flex-col">
+      <SheetContent className="w-full max-w-full sm:max-w-[540px] md:max-w-[720px] p-0 flex flex-col">
         <SheetHeader className="px-4 py-3 border-b shrink-0">
           <SheetTitle className="flex items-center gap-2 text-base">
             <span className="truncate">{company.name}</span>
@@ -488,9 +487,8 @@ export function CompanyPanel({
           </SheetTitle>
         </SheetHeader>
 
-        <div className="flex flex-col lg:flex-row flex-1 min-h-0">
-          {/* Main details column */}
-          <div className="flex-1 px-3 sm:px-4 py-4 space-y-5 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="px-3 sm:px-4 py-4 space-y-5">
           {/* Contact info */}
           <div className="space-y-2 text-sm">
             {company.phone && (
@@ -498,7 +496,6 @@ export function CompanyPanel({
                 <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
                 <a
                   href={`tel:${company.phone}`}
-                  onClick={() => logCall()}
                   className="text-primary hover:underline font-mono"
                 >
                   {company.phone}
@@ -621,7 +618,7 @@ export function CompanyPanel({
           {/* Outcomes */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <Label className="text-sm font-semibold">Call outcomes</Label>
+              <Label className="text-sm font-semibold">Outcomes</Label>
               <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <Keyboard className="h-3 w-3" />
                 <span>
@@ -684,10 +681,45 @@ export function CompanyPanel({
             )}
           </div>
 
-          {/* Callback scheduler */}
-          {outcomes.includes("call_back_later") && (
-            <div className="border rounded-md p-3 bg-muted/20 space-y-2">
-              <Label className="text-sm font-semibold">Schedule callback</Label>
+          {/* Follow up scheduler */}
+          {showFollowUp && (
+            <div className="border rounded-md p-3 bg-muted/20 space-y-3">
+              <Label className="text-sm font-semibold">Schedule follow up</Label>
+
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                  Method
+                </Label>
+                <Select
+                  value={followUpMethod || "__none__"}
+                  onValueChange={(v) => {
+                    const next = v === "__none__" ? "" : (v as FollowUpMethod);
+                    updateFollowUpMethod(next);
+                  }}
+                >
+                  <SelectTrigger className="w-full text-sm">
+                    <SelectValue placeholder="Choose method..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
+                    {FOLLOW_UP_METHODS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {followUpMethod && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {followUpMethod === "in_person"
+                      ? `Where: ${company.address ?? "—"}`
+                      : followUpMethod === "email"
+                        ? `Where: ${contactEmail || contact?.email || company.email || "—"}`
+                        : `Where: ${contactPhone || contact?.phone || company.phone || "—"}`}
+                  </p>
+                )}
+              </div>
+
               <div className="flex flex-col sm:flex-row items-start gap-2">
                 <Calendar
                   mode="single"
@@ -698,7 +730,7 @@ export function CompanyPanel({
                   }
                   className="rounded border bg-background"
                 />
-                <div className="flex-1 space-y-2">
+                <div className="flex-1 space-y-2 w-full">
                   <Select
                     value={callbackTime}
                     onValueChange={(v) => v && setCallbackTime(v)}
@@ -723,7 +755,7 @@ export function CompanyPanel({
                       <Loader2 className="h-3 w-3 animate-spin" />
                     )}
                     {company.callback_at
-                      ? "Update callback"
+                      ? "Update follow up"
                       : "Schedule + invite"}
                   </button>
                   {company.callback_at && (
@@ -740,7 +772,7 @@ export function CompanyPanel({
                         {cancellingCallback && (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         )}
-                        Cancel callback
+                        Cancel follow up
                       </button>
                     </>
                   )}
@@ -751,53 +783,16 @@ export function CompanyPanel({
 
           <Separator />
 
-          {/* Pain Points */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label className="text-sm font-semibold">User pain points</Label>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <Keyboard className="h-3 w-3" />
-                <span>
-                  <Kbd>{modKey}</Kbd>+<Kbd>letter</Kbd>
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {PAIN_POINTS.map((pain) => {
-                const active = painPoints.includes(pain.value);
-                return (
-                  <button
-                    key={pain.value}
-                    onClick={() => togglePainPoint(pain.value)}
-                    className={`inline-flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-sm transition-colors ${
-                      active
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-card hover:bg-accent"
-                    }`}
-                  >
-                    <span className="text-left truncate">{pain.label}</span>
-                    <Kbd>
-                      {modKey}
-                      {pain.shortcut.toUpperCase()}
-                    </Kbd>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Contact details */}
+          {/* Contact */}
           <div className="space-y-3">
-            <Label className="text-sm font-semibold block">Contact details</Label>
+            <Label className="text-sm font-semibold block">Contact</Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Contact name</Label>
+                <Label className="text-xs text-muted-foreground mb-1 block">Name</Label>
                 <Input
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
-                  onBlur={(e) => saveTextField("contact_name", e.target.value)}
+                  onBlur={(e) => saveContactField({ name: e.target.value || null })}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") e.currentTarget.blur();
                   }}
@@ -806,76 +801,44 @@ export function CompanyPanel({
                 />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Contact method</Label>
-                <Select
-                  value={contactMethod || "__none__"}
-                  onValueChange={(v) => {
-                    const next = !v || v === "__none__" ? "" : v;
-                    setContactMethod(next);
-                    saveTextField("contact_method", next);
+                <Label className="text-xs text-muted-foreground mb-1 block">Email</Label>
+                <Input
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  onBlur={(e) => saveContactField({ email: e.target.value || null })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
                   }}
-                >
-                  <SelectTrigger className="h-8 text-sm w-full">
-                    <SelectValue placeholder="Choose..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">—</SelectItem>
-                    <SelectItem value="phone">Phone</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="in_person">In person</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
+                  placeholder="name@example.com"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Phone</Label>
+                <Input
+                  type="tel"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  onBlur={(e) => saveContactField({ phone: e.target.value || null })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
+                  placeholder="+44 ..."
+                  className="h-8 text-sm font-mono"
+                />
               </div>
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Contact address</Label>
-              <Input
-                value={contactAddress}
-                onChange={(e) => setContactAddress(e.target.value)}
-                onBlur={(e) => saveTextField("contact_address", e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                }}
-                placeholder="Email, postal address, or social handle"
-                className="h-8 text-sm"
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Contact notes</Label>
+              <Label className="text-xs text-muted-foreground mb-1 block">Notes</Label>
               <Textarea
                 value={contactNotes}
                 onChange={(e) => setContactNotes(e.target.value)}
-                onBlur={(e) => saveTextField("contact_notes", e.target.value)}
+                onBlur={(e) => saveContactField({ notes: e.target.value || null })}
                 placeholder="Anything worth remembering about this contact"
                 rows={2}
                 className="text-sm"
               />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* User Goals */}
-          <div>
-            <Label className="text-sm font-semibold mb-2 block">User goals</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {USER_GOALS.map((goal) => {
-                const active = userGoals.includes(goal.value);
-                return (
-                  <button
-                    key={goal.value}
-                    onClick={() => toggleUserGoal(goal.value)}
-                    className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm transition-colors text-left ${
-                      active
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-card hover:bg-accent"
-                    }`}
-                  >
-                    <span className="truncate">{goal.label}</span>
-                  </button>
-                );
-              })}
             </div>
           </div>
 
@@ -928,82 +891,6 @@ export function CompanyPanel({
             </div>
           </div>
           </div>
-          {/* /Main details column */}
-
-          {/* Call history panel */}
-          <aside className="order-first lg:order-none w-full lg:w-[240px] shrink-0 border-b lg:border-b-0 lg:border-l bg-muted/20 flex flex-col lg:max-h-none max-h-[200px]">
-            <div className="px-3 py-2.5 border-b shrink-0 flex items-center justify-between">
-              <div className="inline-flex items-center gap-1.5 text-sm font-semibold">
-                <History className="h-3.5 w-3.5" />
-                Call History
-              </div>
-              <span className="text-[10px] text-muted-foreground">
-                {callHistory.length}
-              </span>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {callHistoryLoading && callHistory.length === 0 ? (
-                <p className="p-3 text-xs text-muted-foreground">
-                  Loading...
-                </p>
-              ) : callHistory.length === 0 ? (
-                <p className="p-3 text-xs text-muted-foreground italic">
-                  No phone clicks recorded yet for this company.
-                </p>
-              ) : (
-                <ul className="divide-y">
-                  {callHistory.map((c) => (
-                    <li
-                      key={c.id}
-                      className="group flex items-center justify-between gap-2 px-3 py-2 hover:bg-background/60"
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <div className="min-w-0">
-                          <div className="text-xs font-medium leading-tight truncate">
-                            {new Date(c.ts).toLocaleDateString("en-GB", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "2-digit",
-                            })}{" "}
-                            <span className="font-mono text-muted-foreground">
-                              {new Date(c.ts).toLocaleTimeString("en-GB", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </span>
-                          </div>
-                          <div className="text-[10px] text-muted-foreground truncate">
-                            {c.user_name ?? c.user_email ?? "—"}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => removeCall(c.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                        title="Remove (accidental click)"
-                        aria-label="Delete call record"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            {company.phone && (
-              <div className="px-3 py-2 border-t shrink-0">
-                <button
-                  onClick={() => logCall()}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md border bg-card hover:bg-accent transition-colors"
-                  title="Log a call attempt for this company"
-                >
-                  <Phone className="h-3 w-3" />
-                  Log call attempt
-                </button>
-              </div>
-            )}
-          </aside>
         </div>
       </SheetContent>
     </Sheet>

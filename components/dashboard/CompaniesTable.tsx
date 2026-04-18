@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   ColumnDef,
@@ -42,9 +42,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 import {
   ArrowDown,
   ArrowUp,
@@ -57,17 +56,9 @@ import {
   Columns3,
   ExternalLink,
   GripVertical,
-  SlidersHorizontal,
-  X,
+  Pencil,
 } from "lucide-react";
-import {
-  outcomeLabel,
-  painPointLabel,
-  userGoalLabel,
-  OUTCOME_OPTIONS,
-  PAIN_POINTS,
-  USER_GOALS,
-} from "@/lib/outcomes";
+import { outcomeLabel } from "@/lib/outcomes";
 import type { Company } from "@/lib/use-companies";
 
 const OUTCOME_COLORS: Record<string, string> = {
@@ -76,12 +67,12 @@ const OUTCOME_COLORS: Record<string, string> = {
   interested: "bg-yellow-100 text-yellow-800 border-yellow-200",
   dead_number: "bg-gray-100 text-gray-600 border-gray-200",
   voicemail: "bg-orange-100 text-orange-800 border-orange-200",
-  call_back_later: "bg-orange-100 text-orange-800 border-orange-200",
+  follow_up: "bg-orange-100 text-orange-800 border-orange-200",
 };
 
-const COLUMN_WIDTHS_KEY = "hsc:columnWidths:v2";
-const COLUMN_ORDER_KEY = "hsc:columnOrder:v2"; // bumped: __select__ always first
-const COLUMN_VISIBILITY_KEY = "hsc:columnVisibility:v1";
+const COLUMN_WIDTHS_KEY = "hsc:columnWidths:v3";
+const COLUMN_ORDER_KEY = "hsc:columnOrder:v3";
+const COLUMN_VISIBILITY_KEY = "hsc:columnVisibility:v2";
 const PAGE_SIZE_KEY = "hsc:pageSize:v1";
 
 const COLUMN_LABELS: Record<string, string> = {
@@ -102,118 +93,10 @@ const COLUMN_LABELS: Record<string, string> = {
   youtube: "YouTube",
   address: "Address",
   outcomes: "Outcomes",
-  last_reached_out: "Last Reached",
-  callback_at: "Callback",
-  pain_points: "Pain Points",
   latest_note_content: "Latest Note",
-  call_count: "Calls",
   rating: "Rating",
   reviews: "Reviews",
   contact_name: "Contact",
-  contact_address: "Contact Address",
-  contact_method: "Contact Method",
-  contact_notes: "Contact Notes",
-  user_goals: "Goals",
-};
-
-type FilterConfig =
-  | { type: "select"; options: { value: string; label: string }[] }
-  | { type: "numeric" }
-  | { type: "text" };
-
-// Columns whose options are driven purely by the data (distinct-value dropdowns).
-const DISTINCT_COLUMNS = new Set([
-  "area",
-  "neighborhood",
-  "subtypes",
-  "postal_code",
-]);
-
-// Columns that accept numeric comparison filters: `<N`, `>N`, `=N`.
-const NUMERIC_COLUMNS = new Set(["call_count", "rating", "reviews"]);
-
-// Static-config columns that should render as multi-select checklists
-// rather than single-select dropdowns in the Filter popover.
-const MULTI_SELECT_STATIC_COLUMNS = new Set(["outcomes"]);
-
-// Static (non-data-driven) filter shapes. Distinct/numeric columns are handled
-// separately and should NOT appear here.
-const COLUMN_FILTER_CONFIGS: Partial<Record<string, FilterConfig>> = {
-  verified: {
-    type: "select",
-    options: [
-      { value: "__all__", label: "All" },
-      { value: "true", label: "Verified only" },
-      { value: "false", label: "Not verified" },
-    ],
-  },
-  phone: {
-    type: "select",
-    options: [
-      { value: "__all__", label: "All" },
-      { value: "__nonempty__", label: "Has phone" },
-      { value: "__empty__", label: "No phone" },
-    ],
-  },
-  email: {
-    type: "select",
-    options: [
-      { value: "__all__", label: "All" },
-      { value: "__nonempty__", label: "Has email" },
-      { value: "__empty__", label: "No email" },
-    ],
-  },
-  website: {
-    type: "select",
-    options: [
-      { value: "__all__", label: "All" },
-      { value: "__nonempty__", label: "Has website" },
-      { value: "__empty__", label: "No website" },
-    ],
-  },
-  outcomes: {
-    type: "select",
-    options: [
-      { value: "__all__", label: "All" },
-      { value: "__uncalled__", label: "Uncalled only" },
-      { value: "__any__", label: "Called (any)" },
-      ...OUTCOME_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
-    ],
-  },
-  last_reached_out: {
-    type: "select",
-    options: [
-      { value: "__all__", label: "All" },
-      { value: "__nonempty__", label: "Has been reached" },
-      { value: "__empty__", label: "Never reached" },
-    ],
-  },
-  callback_at: {
-    type: "select",
-    options: [
-      { value: "__all__", label: "All" },
-      { value: "__nonempty__", label: "Has callback" },
-      { value: "__empty__", label: "No callback" },
-    ],
-  },
-  pain_points: {
-    type: "select",
-    options: [
-      { value: "__all__", label: "All" },
-      { value: "__none__", label: "None set" },
-      { value: "__any__", label: "Any set" },
-      ...PAIN_POINTS.map((p) => ({ value: p.label, label: p.label })),
-    ],
-  },
-  user_goals: {
-    type: "select",
-    options: [
-      { value: "__all__", label: "All" },
-      { value: "__none__", label: "None set" },
-      { value: "__any__", label: "Any set" },
-      ...USER_GOALS.map((g) => ({ value: g.label, label: g.label })),
-    ],
-  },
 };
 
 /**
@@ -229,86 +112,6 @@ function toFilterArray(raw: unknown): string[] | null {
   return null;
 }
 
-/** Small multi-select checklist rendered inside the Filter popover. */
-function MultiSelectFilter({
-  options,
-  values,
-  onChange,
-  search = false,
-}: {
-  options: { value: string; label: string }[];
-  values: string[];
-  onChange: (next: string[]) => void;
-  search?: boolean;
-}) {
-  const [q, setQ] = useState("");
-  const filtered = q
-    ? options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
-    : options;
-  const toggle = (v: string) => {
-    const next = values.includes(v)
-      ? values.filter((x) => x !== v)
-      : [...values, v];
-    onChange(next);
-  };
-  return (
-    <div className="space-y-1">
-      {search && options.length > 8 && (
-        <div className="relative">
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search…"
-            className="h-6 text-xs pr-6"
-          />
-          {q && (
-            <button
-              onClick={() => setQ("")}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-      )}
-      <div className="max-h-52 overflow-y-auto space-y-0.5">
-        {filtered.length === 0 ? (
-          <p className="text-[10px] text-muted-foreground px-1 py-1">
-            No options match.
-          </p>
-        ) : (
-          filtered.map((opt) => {
-            const checked = values.includes(opt.value);
-            return (
-              <label
-                key={opt.value}
-                className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-muted cursor-pointer select-none"
-              >
-                <Checkbox
-                  checked={checked}
-                  onCheckedChange={() => toggle(opt.value)}
-                  className="h-3.5 w-3.5 shrink-0"
-                />
-                <span className={`text-xs truncate ${checked ? "font-medium" : ""}`}>
-                  {opt.label}
-                </span>
-              </label>
-            );
-          })
-        )}
-      </div>
-      {values.length > 0 && (
-        <button
-          onClick={() => onChange([])}
-          className="text-[10px] text-muted-foreground hover:text-foreground pt-0.5"
-        >
-          Clear ({values.length})
-        </button>
-      )}
-    </div>
-  );
-}
-
 /** UK outward code — the token before the space in a postal code. */
 function outwardCode(pc: string | null | undefined): string | null {
   if (!pc) return null;
@@ -316,30 +119,6 @@ function outwardCode(pc: string | null | undefined): string | null {
   if (!trimmed) return null;
   const parts = trimmed.split(/\s+/);
   return parts[0] ?? null;
-}
-
-const NUMERIC_OP_RE = /^([<>=])(-?\d+(?:\.\d+)?)$/;
-
-/** Parse a numeric filter value like "<5", ">10", "=3". Returns null if blank or invalid. */
-function parseNumericOp(
-  raw: unknown
-): { op: "<" | ">" | "="; n: number } | null {
-  const s = String(raw ?? "").trim();
-  if (!s) return null;
-  const m = s.match(NUMERIC_OP_RE);
-  if (!m) return null;
-  const n = Number(m[2]);
-  if (!Number.isFinite(n)) return null;
-  return { op: m[1] as "<" | ">" | "=", n };
-}
-
-function applyNumericOp(value: number | null | undefined, raw: unknown): boolean {
-  const parsed = parseNumericOp(raw);
-  if (!parsed) return true; // no / invalid filter → don't filter
-  const v = (value as number) ?? 0;
-  if (parsed.op === "<") return v < parsed.n;
-  if (parsed.op === ">") return v > parsed.n;
-  return v === parsed.n;
 }
 
 function useLocalStorageState<T>(key: string, initial: T) {
@@ -420,24 +199,99 @@ function SocialBtn({
   );
 }
 
-const formatDate = (iso: string | null) => {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "2-digit",
-  });
+type InlineEditCellProps = {
+  value: string | null;
+  placeholder?: string;
+  monospace?: boolean;
+  inputType?: "text" | "tel" | "email" | "url";
+  onSave: (next: string | null) => Promise<void> | void;
 };
 
-const formatDateTime = (iso: string | null) => {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
+/**
+ * Click-to-edit cell. Enter commits; Escape cancels; blur also commits.
+ * Displays value (or em-dash) with a subtle pencil affordance on hover.
+ */
+function InlineEditCell({
+  value,
+  placeholder = "—",
+  monospace,
+  inputType = "text",
+  onSave,
+}: InlineEditCellProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) setDraft(value ?? "");
+  }, [value, editing]);
+
+  const commit = async () => {
+    const trimmed = draft.trim();
+    const next = trimmed === "" ? null : trimmed;
+    if (next === (value ?? null)) {
+      setEditing(false);
+      return;
+    }
+    try {
+      await onSave(next);
+    } catch {
+      // onSave handles toast
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type={inputType}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") commit();
+          else if (e.key === "Escape") {
+            setDraft(value ?? "");
+            setEditing(false);
+          }
+        }}
+        className={`w-full h-6 px-1 text-xs border rounded outline-none focus:ring-1 focus:ring-primary bg-background ${monospace ? "font-mono" : ""}`}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      className="group w-full text-left inline-flex items-center gap-1 min-w-0 hover:bg-accent rounded px-1 py-0.5 -mx-1 -my-0.5"
+      title="Click to edit"
+    >
+      <span
+        className={`truncate flex-1 ${monospace ? "font-mono text-xs" : "text-xs"} ${
+          !value ? "text-muted-foreground" : ""
+        }`}
+      >
+        {value ?? placeholder}
+      </span>
+      <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-40 shrink-0" />
+    </button>
+  );
+}
 
 interface CompaniesTableProps {
   companies: Company[];
@@ -451,7 +305,9 @@ interface CompaniesTableProps {
   onTypeClick: (type: string) => void;
   onAreaClick: (area: string) => void;
   onNeighborhoodClick: (neighborhood: string) => void;
-  /** Optional DOM node to render the Filter/Columns toolbar into (via portal). */
+  /** Apply a partial update locally after an inline edit saves. */
+  onCompanyUpdated: (id: string, patch: Partial<Company>) => void;
+  /** Optional DOM node to render the Columns toolbar into (via portal). */
   toolbarEl?: HTMLElement | null;
   /** Currently selected company ids (shared with map view). */
   selectedIds?: Set<string>;
@@ -473,6 +329,7 @@ export function CompaniesTable({
   onTypeClick,
   onAreaClick,
   onNeighborhoodClick,
+  onCompanyUpdated,
   toolbarEl,
   selectedIds,
   onToggleSelect,
@@ -507,6 +364,53 @@ export function CompaniesTable({
   useEffect(() => {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   }, [columnFilters, sorting, globalFilter]);
+
+  /** PATCH a single company field, then reflect it locally. */
+  const saveField = async (
+    id: string,
+    patch: Partial<Company>
+  ): Promise<void> => {
+    try {
+      const res = await fetch(`/api/companies/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      onCompanyUpdated(id, patch);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+      throw err;
+    }
+  };
+
+  /** PUT contact (upsert). Reflects returned row into the local company. */
+  const saveContact = async (
+    id: string,
+    patch: { name?: string | null; email?: string | null; phone?: string | null; notes?: string | null },
+    existing: Company["contact"]
+  ): Promise<void> => {
+    const payload = {
+      name: existing?.name ?? null,
+      email: existing?.email ?? null,
+      phone: existing?.phone ?? null,
+      notes: existing?.notes ?? null,
+      ...patch,
+    };
+    try {
+      const res = await fetch(`/api/companies/${id}/contact`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const contact = await res.json();
+      onCompanyUpdated(id, { contact });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save contact");
+      throw err;
+    }
+  };
 
   const columns = useMemo<ColumnDef<Company>[]>(
     () => [
@@ -608,12 +512,14 @@ export function CompaniesTable({
       {
         accessorKey: "postal_code",
         header: "Postal",
-        cell: ({ getValue }) => (
-          <span className="font-mono text-xs">
-            {(getValue() as string) || "—"}
-          </span>
+        cell: ({ row }) => (
+          <InlineEditCell
+            value={row.original.postal_code}
+            monospace
+            onSave={(next) => saveField(row.original.id, { postal_code: next })}
+          />
         ),
-        size: 90,
+        size: 100,
         filterFn: (row, id, value) => {
           const vals = toFilterArray(value);
           if (!vals) return true;
@@ -675,15 +581,16 @@ export function CompaniesTable({
       {
         accessorKey: "name",
         header: "Name",
-        cell: ({ getValue, row }) => (
-          <button
-            onClick={() => onPhoneClick(row.original)}
-            className="text-left font-medium hover:underline truncate max-w-full cursor-pointer"
-          >
-            {getValue() as string}
-          </button>
+        cell: ({ row }) => (
+          <NameCell
+            company={row.original}
+            onOpen={() => onPhoneClick(row.original)}
+            onSave={(next) =>
+              next ? saveField(row.original.id, { name: next }) : undefined
+            }
+          />
         ),
-        size: 200,
+        size: 220,
       },
       {
         accessorKey: "verified",
@@ -704,23 +611,15 @@ export function CompaniesTable({
       {
         accessorKey: "phone",
         header: "Phone",
-        cell: ({ getValue, row }) => {
-          const phone = getValue() as string | null;
-          if (!phone) return <span className="text-muted-foreground">—</span>;
-          return (
-            <a
-              href={`tel:${phone}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onPhoneClick(row.original);
-              }}
-              className="text-primary hover:underline font-mono text-xs"
-            >
-              {phone}
-            </a>
-          );
-        },
-        size: 140,
+        cell: ({ row }) => (
+          <InlineEditCell
+            value={row.original.phone}
+            inputType="tel"
+            monospace
+            onSave={(next) => saveField(row.original.id, { phone: next })}
+          />
+        ),
+        size: 150,
         filterFn: (row, id, value) => {
           const v = row.getValue(id) as string | null;
           if (value === "__empty__") return !v;
@@ -731,20 +630,14 @@ export function CompaniesTable({
       {
         accessorKey: "email",
         header: "Email",
-        cell: ({ getValue }) => {
-          const email = getValue() as string | null;
-          if (!email) return <span className="text-muted-foreground">—</span>;
-          return (
-            <a
-              href={`mailto:${email}`}
-              onClick={(e) => e.stopPropagation()}
-              className="text-primary hover:underline text-xs truncate max-w-full inline-block"
-            >
-              {email}
-            </a>
-          );
-        },
-        size: 180,
+        cell: ({ row }) => (
+          <InlineEditCell
+            value={row.original.email}
+            inputType="email"
+            onSave={(next) => saveField(row.original.id, { email: next })}
+          />
+        ),
+        size: 200,
         filterFn: (row, id, value) => {
           const v = row.getValue(id) as string | null;
           if (value === "__empty__") return !v;
@@ -757,29 +650,14 @@ export function CompaniesTable({
       {
         accessorKey: "website",
         header: "Website",
-        cell: ({ getValue }) => {
-          const site = getValue() as string | null;
-          if (!site) return <span className="text-muted-foreground">—</span>;
-          let host = site;
-          try {
-            host = new URL(site).hostname.replace(/^www\./, "");
-          } catch {
-            // keep raw
-          }
-          return (
-            <a
-              href={site}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-primary hover:underline text-xs inline-flex items-center gap-1"
-            >
-              {host}
-              <ExternalLink className="h-3 w-3 shrink-0" />
-            </a>
-          );
-        },
-        size: 160,
+        cell: ({ row }) => (
+          <InlineEditCell
+            value={row.original.website}
+            inputType="url"
+            onSave={(next) => saveField(row.original.id, { website: next })}
+          />
+        ),
+        size: 180,
         filterFn: (row, id, value) => {
           const v = row.getValue(id) as string | null;
           if (value === "__empty__") return !v;
@@ -891,15 +769,13 @@ export function CompaniesTable({
       {
         accessorKey: "address",
         header: "Address",
-        cell: ({ getValue }) => (
-          <span
-            className="text-xs text-muted-foreground truncate block max-w-full"
-            title={(getValue() as string) ?? ""}
-          >
-            {(getValue() as string) || "—"}
-          </span>
+        cell: ({ row }) => (
+          <InlineEditCell
+            value={row.original.address}
+            onSave={(next) => saveField(row.original.id, { address: next })}
+          />
         ),
-        size: 220,
+        size: 240,
       },
       {
         accessorKey: "outcomes",
@@ -941,68 +817,6 @@ export function CompaniesTable({
         },
       },
       {
-        id: "last_reached_out",
-        accessorKey: "last_reached_out",
-        header: "Last Reached",
-        cell: ({ getValue }) => (
-          <span className="text-xs text-muted-foreground">
-            {formatDateTime(getValue() as string | null)}
-          </span>
-        ),
-        size: 120,
-        sortingFn: "datetime",
-        filterFn: (row, id, value) => {
-          const v = row.getValue(id) as string | null;
-          if (value === "__empty__") return !v;
-          if (value === "__nonempty__") return !!v;
-          return true;
-        },
-      },
-      {
-        accessorKey: "callback_at",
-        header: "Callback",
-        cell: ({ getValue }) => {
-          const d = getValue() as string | null;
-          if (!d) return <span className="text-muted-foreground">—</span>;
-          return <span className="text-xs font-medium">{formatDate(d)}</span>;
-        },
-        size: 100,
-        sortingFn: "datetime",
-        filterFn: (row, id, value) => {
-          const v = row.getValue(id) as string | null;
-          if (value === "__empty__") return !v;
-          if (value === "__nonempty__") return !!v;
-          return true;
-        },
-      },
-      {
-        accessorKey: "pain_points",
-        header: "Pain Points",
-        cell: ({ getValue }) => {
-          const pts = (getValue() as string[] | null) ?? [];
-          if (!pts.length) return <span className="text-muted-foreground">—</span>;
-          return (
-            <div className="flex flex-wrap gap-0.5">
-              {pts.map((p) => (
-                <Badge key={p} variant="secondary" className="text-[10px] px-1 py-0 font-normal">
-                  {painPointLabel(p)}
-                </Badge>
-              ))}
-            </div>
-          );
-        },
-        size: 200,
-        enableSorting: false,
-        filterFn: (row, id, value) => {
-          const pts = (row.getValue(id) as string[] | null) ?? [];
-          if (value === "__none__") return pts.length === 0;
-          if (value === "__any__") return pts.length > 0;
-          return pts.some((p) =>
-            painPointLabel(p).toLowerCase().includes(String(value).toLowerCase())
-          );
-        },
-      },
-      {
         accessorKey: "latest_note_content",
         header: "Latest Note",
         cell: ({ getValue }) => {
@@ -1015,19 +829,8 @@ export function CompaniesTable({
             </span>
           );
         },
-        size: 200,
+        size: 220,
         enableSorting: false,
-      },
-      {
-        accessorKey: "call_count",
-        header: "Calls",
-        cell: ({ getValue }) => {
-          const count = (getValue() as number) ?? 0;
-          return <span className="text-xs font-mono">{count || "—"}</span>;
-        },
-        size: 60,
-        filterFn: (row, id, value) =>
-          applyNumericOp(row.getValue(id) as number | null, value),
       },
       {
         accessorKey: "rating",
@@ -1042,8 +845,6 @@ export function CompaniesTable({
           );
         },
         size: 70,
-        filterFn: (row, id, value) =>
-          applyNumericOp(row.getValue(id) as number | null, value),
       },
       {
         accessorKey: "reviews",
@@ -1054,104 +855,26 @@ export function CompaniesTable({
           return <span className="text-xs">{n.toLocaleString()}</span>;
         },
         size: 80,
-        filterFn: (row, id, value) =>
-          applyNumericOp(row.getValue(id) as number | null, value),
       },
       {
-        accessorKey: "contact_name",
+        id: "contact_name",
+        accessorFn: (row) => row.contact?.name ?? null,
         header: "Contact",
-        cell: ({ getValue }) => {
-          const v = getValue() as string | null;
-          if (!v) return <span className="text-muted-foreground">—</span>;
-          return <span className="text-xs">{v}</span>;
-        },
-        size: 140,
-      },
-      {
-        accessorKey: "contact_address",
-        header: "Contact Address",
-        cell: ({ getValue }) => {
-          const v = getValue() as string | null;
-          if (!v) return <span className="text-muted-foreground">—</span>;
-          return <span className="text-xs truncate block">{v}</span>;
-        },
-        size: 180,
-      },
-      {
-        accessorKey: "contact_method",
-        header: "Contact Method",
-        cell: ({ getValue }) => {
-          const v = getValue() as string | null;
-          if (!v) return <span className="text-muted-foreground">—</span>;
-          const label =
-            v === "phone" ? "Phone" :
-            v === "email" ? "Email" :
-            v === "in_person" ? "In person" :
-            v === "other" ? "Other" : v;
-          return <span className="text-xs">{label}</span>;
-        },
-        size: 120,
-      },
-      {
-        accessorKey: "contact_notes",
-        header: "Contact Notes",
-        cell: ({ getValue }) => {
-          const v = getValue() as string | null;
-          if (!v) return <span className="text-muted-foreground">—</span>;
-          return <span className="text-xs truncate block">{v}</span>;
-        },
-        size: 200,
-      },
-      {
-        accessorKey: "user_goals",
-        header: "Goals",
-        cell: ({ getValue }) => {
-          const goals = (getValue() as string[] | null) ?? [];
-          if (!goals.length) return <span className="text-muted-foreground">—</span>;
-          return (
-            <div className="flex flex-wrap gap-0.5">
-              {goals.map((g) => (
-                <Badge key={g} variant="secondary" className="text-[10px] px-1 py-0 font-normal">
-                  {userGoalLabel(g)}
-                </Badge>
-              ))}
-            </div>
-          );
-        },
-        size: 200,
+        cell: ({ row }) => (
+          <InlineEditCell
+            value={row.original.contact?.name ?? null}
+            onSave={(next) =>
+              saveContact(row.original.id, { name: next }, row.original.contact)
+            }
+          />
+        ),
+        size: 160,
         enableSorting: false,
-        filterFn: (row, id, value) => {
-          const goals = (row.getValue(id) as string[] | null) ?? [];
-          if (value === "__none__") return goals.length === 0;
-          if (value === "__any__") return goals.length > 0;
-          return goals.some((g) =>
-            userGoalLabel(g).toLowerCase().includes(String(value).toLowerCase())
-          );
-        },
       },
     ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [onPhoneClick, onTypeClick, onAreaClick, onNeighborhoodClick, selectionEnabled, selectedIds, onToggleSelect, onSetSelection]
   );
-
-  // Distinct-value option lists pulled from the current dataset. Used by the
-  // Filter popover to turn chip/category columns into data-driven dropdowns.
-  const distinctOptions = useMemo(() => {
-    const uniq = (xs: (string | null | undefined)[]) => {
-      const set = new Set<string>();
-      for (const x of xs) {
-        if (!x) continue;
-        const s = String(x).trim();
-        if (s) set.add(s);
-      }
-      return Array.from(set).sort((a, b) => a.localeCompare(b));
-    };
-    return {
-      area: uniq(companies.map((c) => c.area)),
-      neighborhood: uniq(companies.map((c) => c.neighborhood)),
-      subtypes: uniq(companies.flatMap((c) => c.subtypes ?? [])),
-      postal_code: uniq(companies.map((c) => outwardCode(c.postal_code))),
-    } satisfies Record<string, string[]>;
-  }, [companies]);
 
   const globalFilterFn = useMemo(
     () =>
@@ -1347,7 +1070,7 @@ export function CompaniesTable({
 
                 {/* Types */}
                 {c.subtypes && c.subtypes.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-1.5">
+                  <div className="flex flex-wrap gap-1">
                     {c.subtypes.slice(0, 3).map((s) => (
                       <button
                         key={s}
@@ -1366,219 +1089,17 @@ export function CompaniesTable({
                     ))}
                   </div>
                 )}
-
-                {/* Bottom meta row */}
-                <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground pt-1.5 border-t">
-                  <span>
-                    Last:{" "}
-                    {c.last_reached_out
-                      ? formatDateTime(c.last_reached_out)
-                      : "—"}
-                  </span>
-                  {c.callback_at && (
-                    <span className="font-medium text-foreground">
-                      Callback {formatDate(c.callback_at)}
-                    </span>
-                  )}
-                </div>
               </div>
             );
           })
         )}
       </div>
 
-      {/* Desktop: filter + column picker — rendered inline when no portal target,
+      {/* Desktop: column picker only — rendered inline when no portal target,
           or portaled into the control bar next to the Table/Map toggle. */}
       {(() => {
         const toolbar = (
           <div className="hidden md:flex items-center gap-2">
-            {/* Filter */}
-            <Popover>
-              <PopoverTrigger className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                Filter
-                {columnFilters.length > 0 && (
-                  <span className="ml-0.5 text-[10px] font-semibold bg-primary text-primary-foreground rounded-full w-4 h-4 inline-flex items-center justify-center leading-none">
-                    {columnFilters.length}
-                  </span>
-                )}
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-72 p-3 max-h-[28rem] overflow-y-auto">
-                <div className="flex items-center justify-between pb-2 mb-2 border-b">
-                  <span className="text-xs font-semibold">Filters</span>
-                  {columnFilters.length > 0 && (
-                    <button
-                      onClick={() => table.resetColumnFilters()}
-                      className="text-[10px] text-muted-foreground hover:text-foreground"
-                    >
-                      Clear all
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-3">
-                  {table
-                    .getAllLeafColumns()
-                    .filter((c) => c.getIsVisible() && c.getCanFilter())
-                    .map((column) => {
-                      const staticConfig = COLUMN_FILTER_CONFIGS[column.id];
-                      const value = column.getFilterValue();
-                      const label = COLUMN_LABELS[column.id] ?? column.id;
-
-                      // Resolve the filter shape in priority order:
-                      //   1. Data-driven distinct dropdown (area/neighborhood/subtypes/postal_code)
-                      //   2. Numeric operator (call_count/rating/reviews)
-                      //   3. Static select config
-                      //   4. Plain text input
-                      let body: React.ReactNode;
-                      if (DISTINCT_COLUMNS.has(column.id)) {
-                        const opts =
-                          distinctOptions[
-                            column.id as keyof typeof distinctOptions
-                          ] ?? [];
-                        const selectedVals = Array.isArray(value)
-                          ? (value as string[])
-                          : value
-                            ? [value as string]
-                            : [];
-                        body = (
-                          <MultiSelectFilter
-                            options={opts.map((o) => ({ value: o, label: o }))}
-                            values={selectedVals}
-                            onChange={(next) =>
-                              column.setFilterValue(next.length ? next : undefined)
-                            }
-                            search
-                          />
-                        );
-                      } else if (NUMERIC_COLUMNS.has(column.id)) {
-                        const parsed = parseNumericOp(value);
-                        const currentOp = parsed?.op ?? ">";
-                        const currentN = parsed ? String(parsed.n) : "";
-                        const commitNumeric = (op: string, n: string) => {
-                          if (!n.trim()) {
-                            column.setFilterValue(undefined);
-                            return;
-                          }
-                          column.setFilterValue(`${op}${n.trim()}`);
-                        };
-                        body = (
-                          <div className="flex items-center gap-1">
-                            <Select
-                              value={currentOp}
-                              onValueChange={(v) =>
-                                commitNumeric(v ?? ">", currentN)
-                              }
-                            >
-                              <SelectTrigger className="h-7 w-14 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="<">&lt;</SelectItem>
-                                <SelectItem value=">">&gt;</SelectItem>
-                                <SelectItem value="=">=</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <div className="relative flex-1">
-                              <Input
-                                type="number"
-                                step="any"
-                                value={currentN}
-                                onChange={(e) =>
-                                  commitNumeric(currentOp, e.target.value)
-                                }
-                                placeholder="Number"
-                                className="h-7 text-xs pr-7"
-                              />
-                              {currentN !== "" && (
-                                <button
-                                  onClick={() => column.setFilterValue(undefined)}
-                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      } else if (
-                        staticConfig?.type === "select" &&
-                        MULTI_SELECT_STATIC_COLUMNS.has(column.id)
-                      ) {
-                        // Multi-select checklist for static-config columns like outcomes
-                        const opts = staticConfig.options.filter(
-                          (o) => o.value !== "__all__"
-                        );
-                        const selectedVals = Array.isArray(value)
-                          ? (value as string[])
-                          : value
-                            ? [value as string]
-                            : [];
-                        body = (
-                          <MultiSelectFilter
-                            options={opts}
-                            values={selectedVals}
-                            onChange={(next) =>
-                              column.setFilterValue(next.length ? next : undefined)
-                            }
-                          />
-                        );
-                      } else if (staticConfig?.type === "select") {
-                        body = (
-                          <Select
-                            value={(value as string) ?? "__all__"}
-                            onValueChange={(v) =>
-                              column.setFilterValue(v === "__all__" ? undefined : v)
-                            }
-                          >
-                            <SelectTrigger className="h-7 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {staticConfig.options.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        );
-                      } else {
-                        body = (
-                          <div className="relative">
-                            <Input
-                              value={(value as string) ?? ""}
-                              onChange={(e) =>
-                                column.setFilterValue(e.target.value || undefined)
-                              }
-                              placeholder="Filter..."
-                              className="h-7 text-xs pr-7"
-                            />
-                            {!!value && (
-                              <button
-                                onClick={() => column.setFilterValue(undefined)}
-                                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            )}
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div key={column.id} className="space-y-1">
-                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                            {label}
-                          </p>
-                          {body}
-                        </div>
-                      );
-                    })}
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            {/* Columns */}
             <DropdownMenu>
               <DropdownMenuTrigger className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
                 <Columns3 className="h-3.5 w-3.5" />
@@ -1791,6 +1312,96 @@ export function CompaniesTable({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Name cell: single click opens the detail panel, double-click enters
+ * inline-edit mode. Displays a pencil on hover as the edit affordance.
+ */
+function NameCell({
+  company,
+  onOpen,
+  onSave,
+}: {
+  company: Company;
+  onOpen: () => void;
+  onSave: (next: string | null) => Promise<void> | void | undefined;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(company.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+  useEffect(() => {
+    if (!editing) setDraft(company.name);
+  }, [company.name, editing]);
+
+  const commit = async () => {
+    const trimmed = draft.trim();
+    const next = trimmed === "" ? null : trimmed;
+    if (next === company.name) {
+      setEditing(false);
+      return;
+    }
+    try {
+      await onSave(next);
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") commit();
+          else if (e.key === "Escape") {
+            setDraft(company.name);
+            setEditing(false);
+          }
+        }}
+        className="w-full h-6 px-1 text-xs font-medium border rounded outline-none focus:ring-1 focus:ring-primary bg-background"
+      />
+    );
+  }
+
+  return (
+    <div className="group flex items-center gap-1 min-w-0">
+      <button
+        onClick={onOpen}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          setEditing(true);
+        }}
+        className="text-left font-medium hover:underline truncate cursor-pointer flex-1 min-w-0"
+        title="Click to open · Double-click to rename"
+      >
+        {company.name}
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setEditing(true);
+        }}
+        className="opacity-0 group-hover:opacity-60 hover:opacity-100 p-0.5 rounded hover:bg-accent shrink-0"
+        title="Edit name"
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
     </div>
   );
 }

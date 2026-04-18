@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { STATUSES, type Opportunity, type StatusValue } from "./KanbanBoard";
-import { painPointLabel, userGoalLabel } from "@/lib/outcomes";
 import { format } from "date-fns";
 
 interface OpportunityPanelProps {
@@ -248,50 +247,6 @@ export function OpportunityPanel({
             )}
           </div>
 
-          {/* Contact */}
-          {(company?.contact_name ||
-            company?.contact_address ||
-            company?.contact_method ||
-            company?.contact_notes) && (
-            <>
-              <Separator />
-              <div className="space-y-2 text-sm">
-                {company?.contact_name && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Contact</p>
-                    <p className="font-medium">{company.contact_name}</p>
-                  </div>
-                )}
-                {company?.contact_method && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Method</p>
-                    <p>
-                      {company.contact_method === "phone"
-                        ? "Phone"
-                        : company.contact_method === "email"
-                          ? "Email"
-                          : company.contact_method === "in_person"
-                            ? "In person"
-                            : "Other"}
-                    </p>
-                  </div>
-                )}
-                {company?.contact_address && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Address</p>
-                    <p>{company.contact_address}</p>
-                  </div>
-                )}
-                {company?.contact_notes && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Notes</p>
-                    <p className="whitespace-pre-wrap">{company.contact_notes}</p>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
           {/* Tags */}
           {(company?.subtypes?.length || company?.postal_code) && (
             <>
@@ -307,40 +262,6 @@ export function OpportunityPanel({
                     {company.postal_code}
                   </Badge>
                 )}
-              </div>
-            </>
-          )}
-
-          {/* Pain points */}
-          {company?.pain_points && company.pain_points.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Pain Points</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {company.pain_points.map((p) => (
-                    <Badge key={p} variant="outline" className="text-xs">
-                      {painPointLabel(p)}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* User goals */}
-          {company?.user_goals && company.user_goals.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Goals</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {company.user_goals.map((g) => (
-                    <Badge key={g} variant="outline" className="text-xs">
-                      {userGoalLabel(g)}
-                    </Badge>
-                  ))}
-                </div>
               </div>
             </>
           )}

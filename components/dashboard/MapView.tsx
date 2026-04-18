@@ -155,6 +155,65 @@ function escapeHtml(s: string): string {
     .replaceAll("'", "&#039;");
 }
 
+const LEGEND_ITEMS: Array<{ color: string; label: string }> = [
+  { color: "#16a34a", label: "Interested" },
+  { color: "#2563eb", label: "Send website" },
+  { color: "#f59e0b", label: "Follow up" },
+  { color: "#f97316", label: "Voicemail" },
+  { color: "#334155", label: "Dead number" },
+  { color: "#dc2626", label: "Not interested" },
+  { color: "#94a3b8", label: "Uncalled" },
+];
+
+function MapLegend() {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="absolute bottom-4 left-4 z-[1000] pointer-events-auto">
+      <div className="bg-card/95 backdrop-blur border rounded-md shadow-sm text-xs">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 font-medium hover:bg-accent rounded-md"
+        >
+          <span>Legend</span>
+          <span className="text-muted-foreground text-[10px]">{open ? "−" : "+"}</span>
+        </button>
+        {open && (
+          <div className="px-2.5 pb-2 pt-1 space-y-1 border-t">
+            {LEGEND_ITEMS.map((item) => (
+              <div key={item.label} className="flex items-center gap-2">
+                <span
+                  className="inline-block w-3 h-3 rounded-full border border-white shadow-[0_0_0_1px_rgba(0,0,0,0.2)] shrink-0"
+                  style={{ background: item.color }}
+                />
+                <span>{item.label}</span>
+              </div>
+            ))}
+            <div className="pt-1.5 mt-1 border-t space-y-1 text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 rounded-full bg-slate-400 ring-2 ring-slate-900 ring-offset-1 ring-offset-white shrink-0" />
+                <span>No website</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-block w-3 h-3 rounded-full bg-slate-400 shrink-0"
+                  style={{ boxShadow: "0 0 0 1px #111", border: "2px dashed #fff" }}
+                />
+                <span>No email</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="relative inline-block w-3 h-3 rounded-full bg-slate-400 shrink-0">
+                  <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-500 border border-white" />
+                </span>
+                <span>Open now</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function MapView(props: Props) {
   const withCoords = companiesWithCoords(props.companies);
   const ungeocoded = props.companies.length - withCoords.length;
@@ -199,6 +258,8 @@ export function MapView(props: Props) {
         />
         <ClusterLayer {...props} />
       </MapContainer>
+
+      <MapLegend />
 
       {/* Floating geocode button when some companies are ungeocoded */}
       {ungeocoded > 0 && withCoords.length > 0 && (

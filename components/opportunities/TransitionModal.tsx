@@ -72,7 +72,7 @@ export function TransitionModal({ opportunity, onComplete, onCancel }: Transitio
   const [followUpDate, setFollowUpDate] = useState(todayPlus1);
 
   // Sent Website → Discovery Meeting Booked
-  const existingContact = opportunity.company?.contact_name ?? null;
+  const existingContact = opportunity.company?.contact?.name ?? null;
   const contacts = [
     existingContact ? { value: existingContact, label: existingContact } : null,
     { value: "__other__", label: "Other..." },
@@ -122,10 +122,15 @@ export function TransitionModal({ opportunity, onComplete, onCancel }: Transitio
         patch.discovery_meeting_at = meetingDt.toISOString();
 
         if (meetingContact === "__other__" && otherContactName.trim() && opportunity.company) {
-          await fetch(`/api/companies/${opportunity.company.id}`, {
-            method: "PATCH",
+          await fetch(`/api/companies/${opportunity.company.id}/contact`, {
+            method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contact_name: otherContactName.trim() }),
+            body: JSON.stringify({
+              name: otherContactName.trim(),
+              email: opportunity.company.contact?.email ?? null,
+              phone: opportunity.company.contact?.phone ?? null,
+              notes: null,
+            }),
           });
         }
 

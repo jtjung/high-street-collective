@@ -3,14 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Tables } from "@/lib/supabase/types";
 
+export type Contact = Tables<"contacts">;
+
 export type Company = Tables<"companies"> & {
   last_reached_out: string | null;
   latest_note_content: string | null;
-  call_count: number;
+  contact: Contact | null;
 };
 
 const CACHE_KEY = "hsc:companies";
-const CACHE_VERSION = "v7"; // manager/owner → contact_* fields
+const CACHE_VERSION = "v8"; // contacts table + follow_up refactor
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 
 type Cached = {

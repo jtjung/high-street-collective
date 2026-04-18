@@ -1,6 +1,6 @@
 import type { ColumnFiltersState } from "@tanstack/react-table";
 import type { Company } from "@/lib/use-companies";
-import { outcomeLabel, painPointLabel, userGoalLabel } from "@/lib/outcomes";
+import { outcomeLabel } from "@/lib/outcomes";
 import { isOpenAt } from "@/lib/hours";
 
 function matchesSearch(c: Company, q: string): boolean {
@@ -153,20 +153,11 @@ export function applyFilters(
           if (v === "true" && !c.verified) return false;
           if (v === "false" && c.verified) return false;
           break;
-        case "call_count":
-          if (!matchesNumericOp(c.call_count as number | null, v)) return false;
-          break;
         case "rating":
           if (!matchesNumericOp(c.rating as number | null, v)) return false;
           break;
         case "reviews":
           if (!matchesNumericOp(c.reviews as number | null, v)) return false;
-          break;
-        case "last_reached_out":
-          if (!matchesPresence(c.last_reached_out, v)) return false;
-          break;
-        case "callback_at":
-          if (!matchesPresence(c.callback_at, v)) return false;
           break;
         case "name":
           if (!matchesPresence(c.name, v)) return false;
@@ -175,50 +166,11 @@ export function applyFilters(
           if (!matchesPresence(c.address, v)) return false;
           break;
         case "contact_name":
-          if (!matchesPresence(c.contact_name, v)) return false;
+          if (!matchesPresence(c.contact?.name, v)) return false;
           break;
-        case "contact_address":
-          if (!matchesPresence(c.contact_address, v)) return false;
-          break;
-        case "contact_method":
-          if (!matchesPresence(c.contact_method, v)) return false;
-          break;
-        case "contact_notes":
-          if (!matchesPresence(c.contact_notes, v)) return false;
-          break;
-        case "pain_points": {
-          const pts = (c.pain_points as string[]) ?? [];
-          if (v === "__none__") {
-            if (pts.length !== 0) return false;
-          } else if (v === "__any__") {
-            if (pts.length === 0) return false;
-          } else if (
-            !pts.some((p) =>
-              painPointLabel(p).toLowerCase().includes(v.toLowerCase())
-            )
-          ) {
-            return false;
-          }
-          break;
-        }
         case "latest_note_content":
           if (!matchesPresence(c.latest_note_content, v)) return false;
           break;
-        case "user_goals": {
-          const goals = (c.user_goals as string[]) ?? [];
-          if (v === "__none__") {
-            if (goals.length !== 0) return false;
-          } else if (v === "__any__") {
-            if (goals.length === 0) return false;
-          } else if (
-            !goals.some((g) =>
-              userGoalLabel(g).toLowerCase().includes(v.toLowerCase())
-            )
-          ) {
-            return false;
-          }
-          break;
-        }
         default:
           break;
       }

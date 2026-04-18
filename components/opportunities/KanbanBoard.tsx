@@ -12,36 +12,34 @@ import { UserButton } from "@clerk/nextjs";
 import { NavTabs } from "@/components/NavTabs";
 
 export type Opportunity = Tables<"opportunities"> & {
-  company: Pick<
-    Company,
-    | "id"
-    | "name"
-    | "subtypes"
-    | "category"
-    | "phone"
-    | "email"
-    | "address"
-    | "street"
-    | "city"
-    | "postal_code"
-    | "area"
-    | "neighborhood"
-    | "website"
-    | "instagram"
-    | "facebook"
-    | "linkedin"
-    | "rating"
-    | "reviews"
-    | "location_link"
-    | "verified"
-    | "outcomes"
-    | "pain_points"
-    | "user_goals"
-    | "contact_name"
-    | "contact_address"
-    | "contact_method"
-    | "contact_notes"
-  > | null;
+  company:
+    | (Pick<
+        Company,
+        | "id"
+        | "name"
+        | "subtypes"
+        | "category"
+        | "phone"
+        | "email"
+        | "address"
+        | "street"
+        | "city"
+        | "postal_code"
+        | "area"
+        | "neighborhood"
+        | "website"
+        | "instagram"
+        | "facebook"
+        | "linkedin"
+        | "rating"
+        | "reviews"
+        | "location_link"
+        | "verified"
+        | "outcomes"
+      > & {
+        contact?: { name: string | null; email: string | null; phone: string | null } | null;
+      })
+    | null;
 };
 
 export const STATUSES = [

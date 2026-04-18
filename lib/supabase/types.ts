@@ -32,41 +32,6 @@ export type Database = {
         }
         Relationships: []
       }
-      call_attempts: {
-        Row: {
-          company_id: string
-          id: string
-          ts: string
-          user_email: string | null
-          user_id: string
-          user_name: string | null
-        }
-        Insert: {
-          company_id: string
-          id?: string
-          ts?: string
-          user_email?: string | null
-          user_id: string
-          user_name?: string | null
-        }
-        Update: {
-          company_id?: string
-          id?: string
-          ts?: string
-          user_email?: string | null
-          user_id?: string
-          user_name?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "call_attempts_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       call_logs: {
         Row: {
           calendar_event_id: string | null
@@ -189,16 +154,13 @@ export type Database = {
           callback_at: string | null
           category: string | null
           city: string | null
-          contact_address: string | null
-          contact_method: string | null
-          contact_name: string | null
-          contact_notes: string | null
           country_code: string | null
           created_at: string
           domain: string | null
           email: string | null
           employee_count: string | null
           facebook: string | null
+          follow_up_method: string | null
           founded_year: number | null
           geocoded_at: string | null
           id: string
@@ -216,7 +178,6 @@ export type Database = {
           outcomes: string[]
           outscraper_place_id: string | null
           outscraper_task_id: string | null
-          pain_points: string[]
           phone: string | null
           phone_carrier_type: string | null
           postal_code: string | null
@@ -227,7 +188,6 @@ export type Database = {
           street: string | null
           subtypes: string[] | null
           updated_at: string
-          user_goals: string[]
           verified: boolean | null
           website: string | null
           working_hours: Json | null
@@ -242,16 +202,13 @@ export type Database = {
           callback_at?: string | null
           category?: string | null
           city?: string | null
-          contact_address?: string | null
-          contact_method?: string | null
-          contact_name?: string | null
-          contact_notes?: string | null
           country_code?: string | null
           created_at?: string
           domain?: string | null
           email?: string | null
           employee_count?: string | null
           facebook?: string | null
+          follow_up_method?: string | null
           founded_year?: number | null
           geocoded_at?: string | null
           id?: string
@@ -269,7 +226,6 @@ export type Database = {
           outcomes?: string[]
           outscraper_place_id?: string | null
           outscraper_task_id?: string | null
-          pain_points?: string[]
           phone?: string | null
           phone_carrier_type?: string | null
           postal_code?: string | null
@@ -280,7 +236,6 @@ export type Database = {
           street?: string | null
           subtypes?: string[] | null
           updated_at?: string
-          user_goals?: string[]
           verified?: boolean | null
           website?: string | null
           working_hours?: Json | null
@@ -295,16 +250,13 @@ export type Database = {
           callback_at?: string | null
           category?: string | null
           city?: string | null
-          contact_address?: string | null
-          contact_method?: string | null
-          contact_name?: string | null
-          contact_notes?: string | null
           country_code?: string | null
           created_at?: string
           domain?: string | null
           email?: string | null
           employee_count?: string | null
           facebook?: string | null
+          follow_up_method?: string | null
           founded_year?: number | null
           geocoded_at?: string | null
           id?: string
@@ -322,7 +274,6 @@ export type Database = {
           outcomes?: string[]
           outscraper_place_id?: string | null
           outscraper_task_id?: string | null
-          pain_points?: string[]
           phone?: string | null
           phone_carrier_type?: string | null
           postal_code?: string | null
@@ -333,7 +284,6 @@ export type Database = {
           street?: string | null
           subtypes?: string[] | null
           updated_at?: string
-          user_goals?: string[]
           verified?: boolean | null
           website?: string | null
           working_hours?: Json | null
@@ -376,6 +326,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "company_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          company_id: string
+          created_at: string
+          email: string | null
+          id: string
+          name: string | null
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"

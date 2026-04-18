@@ -23,9 +23,14 @@ const MapView = dynamic(
   { ssr: false, loading: () => <div className="h-[70vh] rounded-lg border bg-muted animate-pulse" /> }
 );
 
-const FILTERS_KEY = "hsc:columnFilters:v2";
+const FILTERS_KEY = "hsc:columnFilters:v3";
 const SORTING_KEY = "hsc:sorting:v2";
 const VIEW_MODE_KEY = "hsc:viewMode:v1";
+
+const DEFAULT_FILTERS: ColumnFiltersState = [
+  { id: "website", value: "__empty__" },
+  { id: "subtypes", value: ["Pub", "Bar", "Irish pub", "Brewery"] },
+];
 
 function useLocalState<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(initial);
@@ -67,7 +72,7 @@ export function DashboardClient() {
   const [search, setSearch] = useState("");
   const [columnFilters, setColumnFiltersRaw] = useLocalState<ColumnFiltersState>(
     FILTERS_KEY,
-    [{ id: "website", value: "__empty__" }]
+    DEFAULT_FILTERS
   );
   const [sorting, setSortingRaw] = useLocalState<SortingState>(SORTING_KEY, [
     { id: "postal_code", desc: false },
@@ -238,7 +243,7 @@ export function DashboardClient() {
     undoStack.current.push({ columnFilters, sorting });
     if (undoStack.current.length > 50) undoStack.current.shift();
     setSearch("");
-    setColumnFiltersRaw([]);
+    setColumnFiltersRaw(DEFAULT_FILTERS);
     setSortingRaw([{ id: "postal_code", desc: false }]);
     setOpenAtTime(null);
   }, [columnFilters, sorting, setColumnFiltersRaw, setSortingRaw]);
@@ -541,6 +546,7 @@ export function DashboardClient() {
             onTypeClick={handleTypeClick}
             onAreaClick={handleAreaClick}
             onNeighborhoodClick={handleNeighborhoodClick}
+            onCompanyUpdated={updateCompany}
             toolbarEl={toolbarEl}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}

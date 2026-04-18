@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { companyName, phone, address, startTime: startTimeStr, durationMinutes, summary: customSummary } =
+  const { companyName, phone, address, startTime: startTimeStr, durationMinutes, summary: customSummary, method, location } =
     (await request.json()) as {
       companyName: string;
       phone?: string | null;
@@ -19,6 +19,8 @@ export async function POST(request: Request) {
       startTime: string;
       durationMinutes?: number;
       summary?: string;
+      method?: "in_person" | "email" | "phone" | null;
+      location?: string | null;
     };
 
   if (!startTimeStr) {
@@ -73,12 +75,21 @@ export async function POST(request: Request) {
     const startTime = new Date(startTimeStr);
     const endTime = addMinutes(startTime, durationMinutes ?? 15);
 
+    const methodLabel =
+      method === "in_person" ? "In person" :
+      method === "email" ? "Email" :
+      method === "phone" ? "Phone" : null;
+    const descriptionLines = [
+      methodLabel ? `Method: ${methodLabel}` : null,
+      location ? `Where: ${location}` : null,
+      phone ? `Phone: ${phone}` : null,
+      address ? `Address: ${address}` : null,
+    ].filter(Boolean) as string[];
+
     const event = {
-      summary: customSummary ?? `Callback: ${companyName}`,
-      description: [
-        `Phone: ${phone || "N/A"}`,
-        `Address: ${address || "N/A"}`,
-      ].join("\n"),
+      summary: customSummary ?? `Follow up: ${companyName}`,
+      location: location ?? undefined,
+      description: descriptionLines.length ? descriptionLines.join("\n") : undefined,
       start: {
         dateTime: startTime.toISOString(),
         timeZone: "Europe/London",
@@ -123,7 +134,7 @@ export async function PATCH(request: Request) {
   const { userId } = await getAuth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { eventId, companyName, phone, address, startTime: startTimeStr, durationMinutes } =
+  const { eventId, companyName, phone, address, startTime: startTimeStr, durationMinutes, method, location } =
     (await request.json()) as {
       eventId: string;
       companyName?: string;
@@ -131,6 +142,8 @@ export async function PATCH(request: Request) {
       address?: string | null;
       startTime: string;
       durationMinutes?: number;
+      method?: "in_person" | "email" | "phone" | null;
+      location?: string | null;
     };
 
   if (!eventId || !startTimeStr) {
@@ -155,10 +168,19 @@ export async function PATCH(request: Request) {
       start: { dateTime: startTime.toISOString(), timeZone: "Europe/London" },
       end: { dateTime: endTime.toISOString(), timeZone: "Europe/London" },
     };
-    if (companyName) patch.summary = `Callback: ${companyName}`;
-    if (phone !== undefined || address !== undefined) {
-      patch.description = [`Phone: ${phone || "N/A"}`, `Address: ${address || "N/A"}`].join("\n");
-    }
+    if (companyName) patch.summary = `Follow up: ${companyName}`;
+    if (location !== undefined) patch.location = location ?? "";
+    const methodLabel =
+      method === "in_person" ? "In person" :
+      method === "email" ? "Email" :
+      method === "phone" ? "Phone" : null;
+    const descriptionLines = [
+      methodLabel ? `Method: ${methodLabel}` : null,
+      location ? `Where: ${location}` : null,
+      phone ? `Phone: ${phone}` : null,
+      address ? `Address: ${address}` : null,
+    ].filter(Boolean) as string[];
+    if (descriptionLines.length) patch.description = descriptionLines.join("\n");
 
     const result = await calendar.events.patch({
       calendarId: "primary",

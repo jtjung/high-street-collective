@@ -144,7 +144,7 @@ export function RoutePanel({
             </>
           ) : (
             <>
-              <Navigation className="h-3.5 w-3.5" /> Plan route ({geocodedSelected})
+              <Navigation className="h-3.5 w-3.5" /> Optimize route ({geocodedSelected})
             </>
           )}
         </button>

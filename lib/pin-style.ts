@@ -8,7 +8,7 @@ type PinStyle = {
 const OUTCOME_PRIORITY: Array<{ key: string; style: PinStyle }> = [
   { key: "interested", style: { fill: "#16a34a", label: "Interested" } },
   { key: "send_website", style: { fill: "#2563eb", label: "Send website" } },
-  { key: "call_back_later", style: { fill: "#f59e0b", label: "Call back" } },
+  { key: "follow_up", style: { fill: "#f59e0b", label: "Follow up" } },
   { key: "voicemail", style: { fill: "#f97316", label: "Voicemail" } },
   { key: "dead_number", style: { fill: "#334155", label: "Dead number" } },
   { key: "not_interested", style: { fill: "#dc2626", label: "Not interested" } },
