@@ -9,7 +9,7 @@ import { CompanyPanel } from "./CompanyPanel";
 import { SyncButton } from "./SyncButton";
 import { RoutePanel } from "./RoutePanel";
 import { Input } from "@/components/ui/input";
-import { RefreshCw, Search, X, LayoutGrid, Map as MapIcon, Clock } from "lucide-react";
+import { RefreshCw, Search, X, LayoutGrid, Map as MapIcon, Clock, MapPin, Loader2 } from "lucide-react";
 import { useCompanies, type Company } from "@/lib/use-companies";
 import { NavTabs } from "@/components/NavTabs";
 import { applyFilters } from "@/lib/filter-predicate";
@@ -86,6 +86,55 @@ export function DashboardClient() {
     if (isNaN(h) || isNaN(m)) return null;
     return { day: new Date().getDay(), minutes: h * 60 + m };
   }, [openAtTime]);
+
+  // Portal slot for table toolbar (Filter + Columns), rendered next to the view toggle
+  const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
+
+  // Geocode-all state
+  const [geocoding, setGeocoding] = useState(false);
+
+  const runGeocodeAll = useCallback(async () => {
+    if (geocoding) return;
+    setGeocoding(true);
+    const toastId = toast.loading("Geocoding addresses… this may take a while");
+    try {
+      const res = await fetch("/api/companies/geocode-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: number;
+        failed?: number;
+        skipped?: number;
+        total?: number;
+        error?: string;
+      };
+      if (!res.ok) {
+        toast.error(data.error ?? `Geocoding failed (HTTP ${res.status})`, {
+          id: toastId,
+        });
+        return;
+      }
+      const { success = 0, failed = 0, skipped = 0, total = 0 } = data;
+      if (total === 0) {
+        toast.success("All companies already geocoded", { id: toastId });
+      } else {
+        toast.success(
+          `Geocoded ${success}/${total} · ${failed} failed · ${skipped} skipped`,
+          { id: toastId }
+        );
+      }
+      refresh();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Geocoding failed",
+        { id: toastId }
+      );
+    } finally {
+      setGeocoding(false);
+    }
+  }, [geocoding, refresh]);
 
   // Map view state — not persisted
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -324,6 +373,21 @@ export function DashboardClient() {
               <RefreshCw className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Refresh</span>
             </button>
+            <button
+              onClick={runGeocodeAll}
+              disabled={geocoding}
+              className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              title="Geocode all companies missing coordinates"
+            >
+              {geocoding ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <MapPin className="h-3.5 w-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {geocoding ? "Geocoding…" : "Geocode"}
+              </span>
+            </button>
             <SyncButton onSyncComplete={refresh} />
             <UserButton />
           </div>
@@ -384,7 +448,13 @@ export function DashboardClient() {
             </button>
           )}
 
-          <div className="ml-auto inline-flex items-center border rounded-md p-0.5">
+          {/* Portal target — CompaniesTable renders Filter + Columns here on desktop */}
+          <div
+            ref={setToolbarEl}
+            className="ml-auto hidden md:flex items-center gap-2"
+          />
+
+          <div className="md:ml-0 ml-auto inline-flex items-center border rounded-md p-0.5">
             <button
               onClick={() => setViewMode("table")}
               className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded ${
@@ -429,6 +499,7 @@ export function DashboardClient() {
             onTypeClick={handleTypeClick}
             onAreaClick={handleAreaClick}
             onNeighborhoodClick={handleNeighborhoodClick}
+            toolbarEl={toolbarEl}
           />
         ) : (
           <div className="flex flex-col lg:flex-row gap-3">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -46,7 +47,6 @@ import { Input } from "@/components/ui/input";
 import {
   ArrowDown,
   ArrowUp,
-  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -303,6 +303,8 @@ interface CompaniesTableProps {
   onTypeClick: (type: string) => void;
   onAreaClick: (area: string) => void;
   onNeighborhoodClick: (neighborhood: string) => void;
+  /** Optional DOM node to render the Filter/Columns toolbar into (via portal). */
+  toolbarEl?: HTMLElement | null;
 }
 
 export function CompaniesTable({
@@ -317,6 +319,7 @@ export function CompaniesTable({
   onTypeClick,
   onAreaClick,
   onNeighborhoodClick,
+  toolbarEl,
 }: CompaniesTableProps) {
   const [columnSizing, setColumnSizing] = useLocalStorageState<
     Record<string, number>
@@ -1100,160 +1103,128 @@ export function CompaniesTable({
         )}
       </div>
 
-      {/* Desktop: filter, sort, column picker */}
-      <div className="hidden md:flex items-center justify-end gap-2">
-        {/* Filter */}
-        <Popover>
-          <PopoverTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            Filter
-            {columnFilters.length > 0 && (
-              <span className="ml-0.5 text-[10px] font-semibold bg-primary text-primary-foreground rounded-full w-4 h-4 inline-flex items-center justify-center leading-none">
-                {columnFilters.length}
-              </span>
-            )}
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-72 p-3 max-h-[28rem] overflow-y-auto">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b">
-              <span className="text-xs font-semibold">Filters</span>
-              {columnFilters.length > 0 && (
-                <button
-                  onClick={() => table.resetColumnFilters()}
-                  className="text-[10px] text-muted-foreground hover:text-foreground"
-                >
-                  Clear all
-                </button>
-              )}
-            </div>
-            <div className="space-y-3">
-              {table
-                .getAllLeafColumns()
-                .filter((c) => c.getIsVisible() && c.getCanFilter())
-                .map((column) => {
-                  const config = COLUMN_FILTER_CONFIGS[column.id];
-                  const value = column.getFilterValue();
-                  const label = COLUMN_LABELS[column.id] ?? column.id;
-                  return (
-                    <div key={column.id} className="space-y-1">
-                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                        {label}
-                      </p>
-                      {config?.type === "select" ? (
-                        <Select
-                          value={(value as string) ?? "__all__"}
-                          onValueChange={(v) =>
-                            column.setFilterValue(v === "__all__" ? undefined : v)
-                          }
-                        >
-                          <SelectTrigger className="h-7 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {config.options.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <div className="relative">
-                          <Input
-                            value={(value as string) ?? ""}
-                            onChange={(e) =>
-                              column.setFilterValue(e.target.value || undefined)
-                            }
-                            placeholder="Filter..."
-                            className="h-7 text-xs pr-7"
-                          />
-                          {!!value && (
-                            <button
-                              onClick={() => column.setFilterValue(undefined)}
-                              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+      {/* Desktop: filter + column picker — rendered inline when no portal target,
+          or portaled into the control bar next to the Table/Map toggle. */}
+      {(() => {
+        const toolbar = (
+          <div className="hidden md:flex items-center gap-2">
+            {/* Filter */}
+            <Popover>
+              <PopoverTrigger className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filter
+                {columnFilters.length > 0 && (
+                  <span className="ml-0.5 text-[10px] font-semibold bg-primary text-primary-foreground rounded-full w-4 h-4 inline-flex items-center justify-center leading-none">
+                    {columnFilters.length}
+                  </span>
+                )}
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-3 max-h-[28rem] overflow-y-auto">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b">
+                  <span className="text-xs font-semibold">Filters</span>
+                  {columnFilters.length > 0 && (
+                    <button
+                      onClick={() => table.resetColumnFilters()}
+                      className="text-[10px] text-muted-foreground hover:text-foreground"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {table
+                    .getAllLeafColumns()
+                    .filter((c) => c.getIsVisible() && c.getCanFilter())
+                    .map((column) => {
+                      const config = COLUMN_FILTER_CONFIGS[column.id];
+                      const value = column.getFilterValue();
+                      const label = COLUMN_LABELS[column.id] ?? column.id;
+                      return (
+                        <div key={column.id} className="space-y-1">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            {label}
+                          </p>
+                          {config?.type === "select" ? (
+                            <Select
+                              value={(value as string) ?? "__all__"}
+                              onValueChange={(v) =>
+                                column.setFilterValue(v === "__all__" ? undefined : v)
+                              }
                             >
-                              <X className="h-3 w-3" />
-                            </button>
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {config.options.map((opt) => (
+                                  <SelectItem key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div className="relative">
+                              <Input
+                                value={(value as string) ?? ""}
+                                onChange={(e) =>
+                                  column.setFilterValue(e.target.value || undefined)
+                                }
+                                placeholder="Filter..."
+                                className="h-7 text-xs pr-7"
+                              />
+                              {!!value && (
+                                <button
+                                  onClick={() => column.setFilterValue(undefined)}
+                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-            </div>
-          </PopoverContent>
-        </Popover>
+                      );
+                    })}
+                </div>
+              </PopoverContent>
+            </Popover>
 
-        {/* Sort */}
-        <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
-            <ArrowUpDown className="h-3.5 w-3.5" />
-            {sorting.length > 0
-              ? `${COLUMN_LABELS[sorting[0].id] ?? sorting[0].id} ${sorting[0].desc ? "↓" : "↑"}`
-              : "Sort"}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto w-52">
-            {table
-              .getAllLeafColumns()
-              .filter((c) => c.getIsVisible() && c.getCanSort())
-              .map((column) => {
-                const sorted = column.getIsSorted();
-                const label = COLUMN_LABELS[column.id] ?? column.id;
-                return (
-                  <DropdownMenuItem
-                    key={column.id}
-                    onClick={() => {
-                      const current = sorting.find((s) => s.id === column.id);
-                      if (!current) {
-                        onSortingChange([{ id: column.id, desc: false }]);
-                      } else if (!current.desc) {
-                        onSortingChange([{ id: column.id, desc: true }]);
-                      } else {
-                        onSortingChange([]);
-                      }
-                    }}
-                    className={`flex items-center gap-2 ${sorted ? "bg-accent" : ""}`}
-                  >
-                    <span className="flex-1 text-xs">{label}</span>
-                    {sorted === "asc" && <ArrowUp className="h-3 w-3 shrink-0" />}
-                    {sorted === "desc" && <ArrowDown className="h-3 w-3 shrink-0" />}
-                    {!sorted && <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-20" />}
-                  </DropdownMenuItem>
-                );
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Columns */}
-        <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
-            <Columns3 className="h-3.5 w-3.5" />
-            Columns
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
-            <div className="px-1.5 py-1 text-xs font-medium text-muted-foreground">
-              Toggle columns
-            </div>
-            <DropdownMenuSeparator />
-            {table
-              .getAllLeafColumns()
-              .filter((c) => c.getCanHide())
-              .map((column) => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(v) => column.toggleVisibility(!!v)}
-                  closeOnClick={false}
-                >
-                  {COLUMN_LABELS[column.id] ?? column.id}
-                </DropdownMenuCheckboxItem>
-              ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={resetColumns}>
-              Reset to defaults
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+            {/* Columns */}
+            <DropdownMenu>
+              <DropdownMenuTrigger className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
+                <Columns3 className="h-3.5 w-3.5" />
+                Columns
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                <div className="px-1.5 py-1 text-xs font-medium text-muted-foreground">
+                  Toggle columns
+                </div>
+                <DropdownMenuSeparator />
+                {table
+                  .getAllLeafColumns()
+                  .filter((c) => c.getCanHide())
+                  .map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(v) => column.toggleVisibility(!!v)}
+                      closeOnClick={false}
+                    >
+                      {COLUMN_LABELS[column.id] ?? column.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={resetColumns}>
+                  Reset to defaults
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+        return toolbarEl ? createPortal(toolbar, toolbarEl) : (
+          <div className="hidden md:flex items-center justify-end gap-2">{toolbar}</div>
+        );
+      })()}
 
       {/* Desktop: full table */}
       <div className="hidden md:block border rounded-lg overflow-auto bg-card shadow-sm">
