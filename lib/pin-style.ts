@@ -30,7 +30,7 @@ export function pinStyleFor(c: Company): PinStyle {
  */
 export function pinMarkerHtml(
   c: Company,
-  opts: { selected?: boolean; order?: number } = {}
+  opts: { selected?: boolean; order?: number; isOpen?: boolean | null } = {}
 ): string {
   const { fill } = pinStyleFor(c);
   const noWebsite = !c.website;
@@ -51,5 +51,9 @@ export function pinMarkerHtml(
     opts.order != null
       ? `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;font-family:ui-sans-serif,system-ui;line-height:1;">${opts.order}</span>`
       : "";
-  return `<div style="position:relative;${base}">${label}</div>`;
+  const dot =
+    opts.isOpen != null
+      ? `<div style="position:absolute;bottom:-2px;right:-2px;width:7px;height:7px;border-radius:50%;background:${opts.isOpen ? "#22c55e" : "#ef4444"};border:1.5px solid #fff;"></div>`
+      : "";
+  return `<div style="position:relative;${base}">${label}${dot}</div>`;
 }

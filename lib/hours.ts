@@ -103,3 +103,94 @@ export function isOpenNow(working_hours: unknown): boolean {
   const now = new Date();
   return isOpenAt(working_hours, now.getDay(), now.getHours() * 60 + now.getMinutes());
 }
+
+const DAY_NAMES_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+// Display order: Monday-first (UK convention)
+const DISPLAY_DAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
+
+function formatMinutes(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return m === 0 ? `${h12} ${period}` : `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+/**
+ * Returns a human-readable open-status label, e.g.
+ *   { open: true,  label: "Open · closes 5 PM" }
+ *   { open: false, label: "Closed · opens 9 AM Mon" }
+ * Returns null if no hours data is available for today.
+ */
+export function openStatusLabel(
+  working_hours: unknown
+): { open: boolean; label: string } | null {
+  if (
+    !working_hours ||
+    typeof working_hours !== "object" ||
+    Array.isArray(working_hours)
+  )
+    return null;
+
+  const hours = working_hours as Record<string, unknown>;
+  const now = new Date();
+  const todayRaw = hours[DAY_NAMES[now.getDay()]];
+  if (!todayRaw || typeof todayRaw !== "string") return null;
+
+  const parsed = parseHoursString(todayRaw.trim());
+  if (!parsed) return null;
+
+  const open = isOpenNow(working_hours);
+
+  if (open) {
+    if (parsed.kind === "open24") return { open: true, label: "Open 24h" };
+    if (parsed.kind === "range")
+      return { open: true, label: `Open · closes ${formatMinutes(parsed.closeMinutes)}` };
+  } else {
+    if (
+      parsed.kind === "range" &&
+      now.getHours() * 60 + now.getMinutes() < parsed.openMinutes
+    ) {
+      return { open: false, label: `Closed · opens ${formatMinutes(parsed.openMinutes)}` };
+    }
+    for (let delta = 1; delta <= 7; delta++) {
+      const nextDay = (now.getDay() + delta) % 7;
+      const nextRaw = hours[DAY_NAMES[nextDay]];
+      if (!nextRaw || typeof nextRaw !== "string") continue;
+      const nextParsed = parseHoursString(nextRaw.trim());
+      if (!nextParsed || nextParsed.kind === "closed") continue;
+      const dayLabel = delta === 1 ? "tomorrow" : DAY_NAMES_SHORT[nextDay];
+      if (nextParsed.kind === "open24")
+        return { open: false, label: `Closed · opens ${dayLabel}` };
+      if (nextParsed.kind === "range")
+        return {
+          open: false,
+          label: `Closed · opens ${formatMinutes(nextParsed.openMinutes)} ${dayLabel}`,
+        };
+    }
+    return { open: false, label: "Closed" };
+  }
+  return null;
+}
+
+/**
+ * Returns all 7 days formatted for display (Monday-first).
+ * Returns null if no hours data exists.
+ */
+export function allHoursFormatted(
+  working_hours: unknown
+): Array<{ day: string; hours: string }> | null {
+  if (
+    !working_hours ||
+    typeof working_hours !== "object" ||
+    Array.isArray(working_hours)
+  )
+    return null;
+
+  const h = working_hours as Record<string, unknown>;
+  const result = DISPLAY_DAY_ORDER.map((i) => ({
+    day: DAY_NAMES_SHORT[i],
+    hours: typeof h[DAY_NAMES[i]] === "string" ? (h[DAY_NAMES[i]] as string).trim() : "—",
+  }));
+  return result.some((r) => r.hours !== "—") ? result : null;
+}

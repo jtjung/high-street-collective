@@ -9,6 +9,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import type { Company } from "@/lib/use-companies";
 import { pinMarkerHtml } from "@/lib/pin-style";
+import { openStatusLabel, allHoursFormatted } from "@/lib/hours";
 import { Button } from "@/components/ui/button";
 
 type Props = {
@@ -68,20 +69,36 @@ function ClusterLayer({
     const withCoords = companiesWithCoords(companies);
     const markers = withCoords.map((c) => {
       const order = orderIndex?.get(c.id);
+      const status = openStatusLabel(c.working_hours);
+      const weekHours = allHoursFormatted(c.working_hours);
+
       const icon = L.divIcon({
         html: pinMarkerHtml(c, {
           selected: selectedIds.has(c.id),
           order,
+          isOpen: status ? status.open : null,
         }),
         className: "hsc-pin",
         iconSize: order != null ? [24, 24] : [16, 16],
         iconAnchor: order != null ? [12, 12] : [8, 8],
       });
       const m = L.marker([c.latitude, c.longitude], { icon });
+
+      const headerHtml = `<strong>${escapeHtml(c.name)}</strong>${c.postal_code ? ` · ${escapeHtml(c.postal_code)}` : ""}`;
+      const statusHtml = status
+        ? `<div style="font-size:11px;margin-top:3px;color:${status.open ? "#16a34a" : "#dc2626"};">● ${escapeHtml(status.label)}</div>`
+        : "";
+      const hoursHtml = weekHours
+        ? `<table style="margin-top:5px;border-collapse:collapse;font-size:10px;">${weekHours
+            .map(
+              ({ day, hours }) =>
+                `<tr><td style="padding-right:8px;opacity:.6;">${escapeHtml(day)}</td><td>${escapeHtml(hours)}</td></tr>`
+            )
+            .join("")}</table>`
+        : "";
+
       m.bindTooltip(
-        `<strong>${escapeHtml(c.name)}</strong>${
-          c.postal_code ? ` · ${escapeHtml(c.postal_code)}` : ""
-        }`,
+        `<div style="min-width:150px;">${headerHtml}${statusHtml}${hoursHtml}</div>`,
         { direction: "top", offset: [0, -8] }
       );
       m.on("click", (e) => {
