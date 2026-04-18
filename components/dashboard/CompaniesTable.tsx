@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowDown,
   ArrowUp,
@@ -355,6 +356,12 @@ interface CompaniesTableProps {
   onNeighborhoodClick: (neighborhood: string) => void;
   /** Optional DOM node to render the Filter/Columns toolbar into (via portal). */
   toolbarEl?: HTMLElement | null;
+  /** Currently selected company ids (shared with map view). */
+  selectedIds?: Set<string>;
+  /** Toggle a single company's selection. */
+  onToggleSelect?: (id: string) => void;
+  /** Replace the entire selection (used by "select all visible" / clear). */
+  onSetSelection?: (next: Set<string>) => void;
 }
 
 export function CompaniesTable({
@@ -370,7 +377,11 @@ export function CompaniesTable({
   onAreaClick,
   onNeighborhoodClick,
   toolbarEl,
+  selectedIds,
+  onToggleSelect,
+  onSetSelection,
 }: CompaniesTableProps) {
+  const selectionEnabled = !!(selectedIds && onToggleSelect && onSetSelection);
   const [columnSizing, setColumnSizing] = useLocalStorageState<
     Record<string, number>
   >(COLUMN_WIDTHS_KEY, {});
@@ -402,6 +413,57 @@ export function CompaniesTable({
 
   const columns = useMemo<ColumnDef<Company>[]>(
     () => [
+      ...(selectionEnabled
+        ? [
+            {
+              id: "__select__",
+              header: ({ table }) => {
+                const pageRows = table.getRowModel().rows;
+                const allChecked =
+                  pageRows.length > 0 &&
+                  pageRows.every((r) => selectedIds!.has(r.original.id));
+                const someChecked = pageRows.some((r) =>
+                  selectedIds!.has(r.original.id)
+                );
+                return (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={allChecked}
+                      indeterminate={!allChecked && someChecked}
+                      onCheckedChange={(v) => {
+                        const next = new Set(selectedIds!);
+                        if (v) {
+                          pageRows.forEach((r) => next.add(r.original.id));
+                        } else {
+                          pageRows.forEach((r) => next.delete(r.original.id));
+                        }
+                        onSetSelection!(next);
+                      }}
+                      aria-label="Select all on page"
+                    />
+                  </div>
+                );
+              },
+              cell: ({ row }) => {
+                const id = row.original.id;
+                const checked = selectedIds!.has(id);
+                return (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => onToggleSelect!(id)}
+                      aria-label={`Select ${row.original.name}`}
+                    />
+                  </div>
+                );
+              },
+              size: 36,
+              enableSorting: false,
+              enableHiding: false,
+              enableResizing: false,
+            } satisfies ColumnDef<Company>,
+          ]
+        : []),
       {
         accessorKey: "area",
         header: "Area",
@@ -960,7 +1022,7 @@ export function CompaniesTable({
         },
       },
     ],
-    [onPhoneClick, onTypeClick, onAreaClick, onNeighborhoodClick]
+    [onPhoneClick, onTypeClick, onAreaClick, onNeighborhoodClick, selectionEnabled, selectedIds, onToggleSelect, onSetSelection]
   );
 
   // Distinct-value option lists pulled from the current dataset. Used by the

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { label: "Leads", href: "/leads" },
   { label: "Opportunities", href: "/opportunities" },
+  { label: "Campaigns", href: "/campaigns" },
   { label: "Goals", href: "/goals" },
 ];
 
@@ -18,7 +19,8 @@ export function NavTabs() {
           key={tab.href}
           href={tab.href}
           className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-            pathname === tab.href
+            pathname === tab.href ||
+            (tab.href !== "/" && pathname?.startsWith(tab.href))
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground hover:text-foreground hover:bg-accent"
           }`}

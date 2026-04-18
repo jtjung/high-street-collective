@@ -9,8 +9,9 @@ import { CompanyPanel } from "./CompanyPanel";
 import { SyncButton } from "./SyncButton";
 import { RoutePanel } from "./RoutePanel";
 import { QuickFilters } from "./QuickFilters";
+import { CreateCampaignModal } from "./CreateCampaignModal";
 import { Input } from "@/components/ui/input";
-import { RefreshCw, Search, X, LayoutGrid, Map as MapIcon, Clock, MapPin, Loader2 } from "lucide-react";
+import { RefreshCw, Search, X, LayoutGrid, Map as MapIcon, Clock, MapPin, Loader2, Megaphone } from "lucide-react";
 import { useCompanies, type Company } from "@/lib/use-companies";
 import { NavTabs } from "@/components/NavTabs";
 import { applyFilters } from "@/lib/filter-predicate";
@@ -139,6 +140,7 @@ export function DashboardClient() {
 
   // Map view state — not persisted
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [campaignModalOpen, setCampaignModalOpen] = useState(false);
   const [visibleInMap, setVisibleInMap] = useState<string[]>([]);
   const [orderedIds, setOrderedIds] = useState<string[] | null>(null);
   const [routeStats, setRouteStats] = useState<{
@@ -449,6 +451,29 @@ export function DashboardClient() {
             </button>
           )}
 
+          {selectedIds.size > 0 && (
+            <div className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-primary/10 border border-primary/30">
+              <span className="text-primary font-medium">
+                {selectedIds.size} selected
+              </span>
+              <button
+                onClick={() => setCampaignModalOpen(true)}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 ml-1"
+                title="Create a campaign with selected companies"
+              >
+                <Megaphone className="h-3.5 w-3.5" />
+                Create campaign
+              </button>
+              <button
+                onClick={clearSelection}
+                className="text-primary/70 hover:text-primary ml-0.5"
+                aria-label="Clear selection"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+
           {/* Portal target — CompaniesTable renders Filter + Columns here on desktop */}
           <div
             ref={setToolbarEl}
@@ -510,6 +535,9 @@ export function DashboardClient() {
             onAreaClick={handleAreaClick}
             onNeighborhoodClick={handleNeighborhoodClick}
             toolbarEl={toolbarEl}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onSetSelection={setSelectedIds}
           />
         ) : (
           <div className="flex flex-col lg:flex-row gap-3">
@@ -554,6 +582,15 @@ export function DashboardClient() {
         open={panelOpen}
         onOpenChange={setPanelOpen}
         onUpdated={updateCompany}
+      />
+
+      <CreateCampaignModal
+        open={campaignModalOpen}
+        onOpenChange={setCampaignModalOpen}
+        selectedCompanies={selectedCompanies}
+        onCreated={() => {
+          clearSelection();
+        }}
       />
     </div>
   );

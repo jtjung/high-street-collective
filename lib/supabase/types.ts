@@ -111,6 +111,75 @@ export type Database = {
           },
         ]
       }
+      campaign_members: {
+        Row: {
+          added_at: string
+          campaign_id: string
+          company_id: string
+        }
+        Insert: {
+          added_at?: string
+          campaign_id: string
+          company_id: string
+        }
+        Update: {
+          added_at?: string
+          campaign_id?: string
+          company_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_members_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_members_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          campaign_date: string
+          created_at: string
+          created_by_user_email: string | null
+          created_by_user_id: string | null
+          created_by_user_name: string | null
+          id: string
+          method: string
+          name: string
+          notes: string | null
+        }
+        Insert: {
+          campaign_date: string
+          created_at?: string
+          created_by_user_email?: string | null
+          created_by_user_id?: string | null
+          created_by_user_name?: string | null
+          id?: string
+          method: string
+          name: string
+          notes?: string | null
+        }
+        Update: {
+          campaign_date?: string
+          created_at?: string
+          created_by_user_email?: string | null
+          created_by_user_id?: string | null
+          created_by_user_name?: string | null
+          id?: string
+          method?: string
+          name?: string
+          notes?: string | null
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           address: string | null
