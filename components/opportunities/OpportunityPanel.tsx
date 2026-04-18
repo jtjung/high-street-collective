@@ -248,21 +248,44 @@ export function OpportunityPanel({
             )}
           </div>
 
-          {/* Contacts */}
-          {(company?.manager_name || company?.owner_name) && (
+          {/* Contact */}
+          {(company?.contact_name ||
+            company?.contact_address ||
+            company?.contact_method ||
+            company?.contact_notes) && (
             <>
               <Separator />
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {company.manager_name && (
+              <div className="space-y-2 text-sm">
+                {company?.contact_name && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Manager</p>
-                    <p className="font-medium">{company.manager_name}</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">Contact</p>
+                    <p className="font-medium">{company.contact_name}</p>
                   </div>
                 )}
-                {company.owner_name && (
+                {company?.contact_method && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Owner</p>
-                    <p className="font-medium">{company.owner_name}</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">Method</p>
+                    <p>
+                      {company.contact_method === "phone"
+                        ? "Phone"
+                        : company.contact_method === "email"
+                          ? "Email"
+                          : company.contact_method === "in_person"
+                            ? "In person"
+                            : "Other"}
+                    </p>
+                  </div>
+                )}
+                {company?.contact_address && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Address</p>
+                    <p>{company.contact_address}</p>
+                  </div>
+                )}
+                {company?.contact_notes && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-0.5">Notes</p>
+                    <p className="whitespace-pre-wrap">{company.contact_notes}</p>
                   </div>
                 )}
               </div>

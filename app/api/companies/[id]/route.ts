@@ -41,8 +41,10 @@ type CompanyPatch = {
   not_interested_reason?: string | null;
   pain_points?: string[];
   user_goals?: string[];
-  manager_name?: string | null;
-  owner_name?: string | null;
+  contact_name?: string | null;
+  contact_address?: string | null;
+  contact_method?: string | null;
+  contact_notes?: string | null;
 };
 
 export async function PATCH(
@@ -69,8 +71,13 @@ export async function PATCH(
     update.not_interested_reason = body.not_interested_reason;
   if (body.pain_points !== undefined) update.pain_points = body.pain_points;
   if (body.user_goals !== undefined) update.user_goals = body.user_goals;
-  if (body.manager_name !== undefined) update.manager_name = body.manager_name;
-  if (body.owner_name !== undefined) update.owner_name = body.owner_name;
+  if (body.contact_name !== undefined) update.contact_name = body.contact_name;
+  if (body.contact_address !== undefined)
+    update.contact_address = body.contact_address;
+  if (body.contact_method !== undefined)
+    update.contact_method = body.contact_method;
+  if (body.contact_notes !== undefined)
+    update.contact_notes = body.contact_notes;
 
   const { data, error } = await supabase
     .from("companies")

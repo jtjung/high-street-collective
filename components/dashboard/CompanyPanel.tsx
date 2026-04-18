@@ -100,8 +100,10 @@ export function CompanyPanel({
   );
   const [painPoints, setPainPoints] = useState<string[]>([]);
   const [userGoals, setUserGoals] = useState<string[]>([]);
-  const [managerName, setManagerName] = useState<string>("");
-  const [ownerName, setOwnerName] = useState<string>("");
+  const [contactName, setContactName] = useState<string>("");
+  const [contactAddress, setContactAddress] = useState<string>("");
+  const [contactMethod, setContactMethod] = useState<string>("");
+  const [contactNotes, setContactNotes] = useState<string>("");
 
   const [callbackDate, setCallbackDate] = useState<Date | undefined>();
   const [callbackTime, setCallbackTime] = useState<string>("10:00");
@@ -115,8 +117,10 @@ export function CompanyPanel({
     setOutcomes(company.outcomes ?? []);
     setPainPoints(company.pain_points ?? []);
     setUserGoals(company.user_goals ?? []);
-    setManagerName(company.manager_name ?? "");
-    setOwnerName(company.owner_name ?? "");
+    setContactName(company.contact_name ?? "");
+    setContactAddress(company.contact_address ?? "");
+    setContactMethod(company.contact_method ?? "");
+    setContactNotes(company.contact_notes ?? "");
     setNotInterestedReason(company.not_interested_reason ?? null);
     setNoteInput("");
     if (company.callback_at) {
@@ -278,7 +282,10 @@ export function CompanyPanel({
   );
 
   const saveTextField = useCallback(
-    async (field: "manager_name" | "owner_name", value: string) => {
+    async (
+      field: "contact_name" | "contact_address" | "contact_method" | "contact_notes",
+      value: string
+    ) => {
       if (!company) return;
       try {
         const res = await fetch(`/api/companies/${company.id}`, {
@@ -781,36 +788,68 @@ export function CompanyPanel({
 
           <Separator />
 
-          {/* Contact names */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Contact details */}
+          <div className="space-y-3">
+            <Label className="text-sm font-semibold block">Contact details</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Contact name</Label>
+                <Input
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  onBlur={(e) => saveTextField("contact_name", e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
+                  placeholder="e.g. Sarah Jones"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Contact method</Label>
+                <Select
+                  value={contactMethod || "__none__"}
+                  onValueChange={(v) => {
+                    const next = !v || v === "__none__" ? "" : v;
+                    setContactMethod(next);
+                    saveTextField("contact_method", next);
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-sm w-full">
+                    <SelectValue placeholder="Choose..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
+                    <SelectItem value="phone">Phone</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="in_person">In person</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Manager name</Label>
+              <Label className="text-xs text-muted-foreground mb-1 block">Contact address</Label>
               <Input
-                value={managerName}
-                onChange={(e) => setManagerName(e.target.value)}
-                onBlur={(e) => saveTextField("manager_name", e.target.value)}
+                value={contactAddress}
+                onChange={(e) => setContactAddress(e.target.value)}
+                onBlur={(e) => saveTextField("contact_address", e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.currentTarget.blur();
-                  }
+                  if (e.key === "Enter") e.currentTarget.blur();
                 }}
-                placeholder="e.g. Sarah Jones"
+                placeholder="Email, postal address, or social handle"
                 className="h-8 text-sm"
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Owner / Landlord name</Label>
-              <Input
-                value={ownerName}
-                onChange={(e) => setOwnerName(e.target.value)}
-                onBlur={(e) => saveTextField("owner_name", e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.currentTarget.blur();
-                  }
-                }}
-                placeholder="e.g. Tom Smith"
-                className="h-8 text-sm"
+              <Label className="text-xs text-muted-foreground mb-1 block">Contact notes</Label>
+              <Textarea
+                value={contactNotes}
+                onChange={(e) => setContactNotes(e.target.value)}
+                onBlur={(e) => saveTextField("contact_notes", e.target.value)}
+                placeholder="Anything worth remembering about this contact"
+                rows={2}
+                className="text-sm"
               />
             </div>
           </div>

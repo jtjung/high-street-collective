@@ -10,7 +10,7 @@ export type Company = Tables<"companies"> & {
 };
 
 const CACHE_KEY = "hsc:companies";
-const CACHE_VERSION = "v6"; // bumped for working_hours field
+const CACHE_VERSION = "v7"; // manager/owner → contact_* fields
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 
 type Cached = {

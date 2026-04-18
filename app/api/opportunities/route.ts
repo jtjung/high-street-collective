@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 
 const COMPANY_COLUMNS =
-  "id, name, subtypes, category, phone, email, address, street, city, postal_code, area, neighborhood, website, instagram, facebook, linkedin, rating, reviews, location_link, verified, outcomes, pain_points, user_goals, manager_name, owner_name";
+  "id, name, subtypes, category, phone, email, address, street, city, postal_code, area, neighborhood, website, instagram, facebook, linkedin, rating, reviews, location_link, verified, outcomes, pain_points, user_goals, contact_name, contact_address, contact_method, contact_notes";
 
 export async function GET() {
   const { userId } = await getAuth();

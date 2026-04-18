@@ -37,8 +37,10 @@ export type Opportunity = Tables<"opportunities"> & {
     | "outcomes"
     | "pain_points"
     | "user_goals"
-    | "manager_name"
-    | "owner_name"
+    | "contact_name"
+    | "contact_address"
+    | "contact_method"
+    | "contact_notes"
   > | null;
 };
 

@@ -108,8 +108,10 @@ const COLUMN_LABELS: Record<string, string> = {
   call_count: "Calls",
   rating: "Rating",
   reviews: "Reviews",
-  manager_name: "Manager",
-  owner_name: "Owner / Landlord",
+  contact_name: "Contact",
+  contact_address: "Contact Address",
+  contact_method: "Contact Method",
+  contact_notes: "Contact Notes",
   user_goals: "Goals",
 };
 
@@ -886,8 +888,8 @@ export function CompaniesTable({
           applyNumericOp(row.getValue(id) as number | null, value),
       },
       {
-        accessorKey: "manager_name",
-        header: "Manager",
+        accessorKey: "contact_name",
+        header: "Contact",
         cell: ({ getValue }) => {
           const v = getValue() as string | null;
           if (!v) return <span className="text-muted-foreground">—</span>;
@@ -896,14 +898,39 @@ export function CompaniesTable({
         size: 140,
       },
       {
-        accessorKey: "owner_name",
-        header: "Owner / Landlord",
+        accessorKey: "contact_address",
+        header: "Contact Address",
         cell: ({ getValue }) => {
           const v = getValue() as string | null;
           if (!v) return <span className="text-muted-foreground">—</span>;
-          return <span className="text-xs">{v}</span>;
+          return <span className="text-xs truncate block">{v}</span>;
         },
-        size: 160,
+        size: 180,
+      },
+      {
+        accessorKey: "contact_method",
+        header: "Contact Method",
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          const label =
+            v === "phone" ? "Phone" :
+            v === "email" ? "Email" :
+            v === "in_person" ? "In person" :
+            v === "other" ? "Other" : v;
+          return <span className="text-xs">{label}</span>;
+        },
+        size: 120,
+      },
+      {
+        accessorKey: "contact_notes",
+        header: "Contact Notes",
+        cell: ({ getValue }) => {
+          const v = getValue() as string | null;
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          return <span className="text-xs truncate block">{v}</span>;
+        },
+        size: 200,
       },
       {
         accessorKey: "user_goals",

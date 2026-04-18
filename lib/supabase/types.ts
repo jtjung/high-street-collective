@@ -120,6 +120,10 @@ export type Database = {
           callback_at: string | null
           category: string | null
           city: string | null
+          contact_address: string | null
+          contact_method: string | null
+          contact_name: string | null
+          contact_notes: string | null
           country_code: string | null
           created_at: string
           domain: string | null
@@ -137,14 +141,12 @@ export type Database = {
           linkedin: string | null
           location_link: string | null
           longitude: number | null
-          manager_name: string | null
           name: string
           neighborhood: string | null
           not_interested_reason: string | null
           outcomes: string[]
           outscraper_place_id: string | null
           outscraper_task_id: string | null
-          owner_name: string | null
           pain_points: string[]
           phone: string | null
           phone_carrier_type: string | null
@@ -171,6 +173,10 @@ export type Database = {
           callback_at?: string | null
           category?: string | null
           city?: string | null
+          contact_address?: string | null
+          contact_method?: string | null
+          contact_name?: string | null
+          contact_notes?: string | null
           country_code?: string | null
           created_at?: string
           domain?: string | null
@@ -188,14 +194,12 @@ export type Database = {
           linkedin?: string | null
           location_link?: string | null
           longitude?: number | null
-          manager_name?: string | null
           name: string
           neighborhood?: string | null
           not_interested_reason?: string | null
           outcomes?: string[]
           outscraper_place_id?: string | null
           outscraper_task_id?: string | null
-          owner_name?: string | null
           pain_points?: string[]
           phone?: string | null
           phone_carrier_type?: string | null
@@ -222,6 +226,10 @@ export type Database = {
           callback_at?: string | null
           category?: string | null
           city?: string | null
+          contact_address?: string | null
+          contact_method?: string | null
+          contact_name?: string | null
+          contact_notes?: string | null
           country_code?: string | null
           created_at?: string
           domain?: string | null
@@ -239,14 +247,12 @@ export type Database = {
           linkedin?: string | null
           location_link?: string | null
           longitude?: number | null
-          manager_name?: string | null
           name?: string
           neighborhood?: string | null
           not_interested_reason?: string | null
           outcomes?: string[]
           outscraper_place_id?: string | null
           outscraper_task_id?: string | null
-          owner_name?: string | null
           pain_points?: string[]
           phone?: string | null
           phone_carrier_type?: string | null

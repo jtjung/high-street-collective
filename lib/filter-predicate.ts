@@ -133,11 +133,17 @@ export function applyFilters(
         case "address":
           if (!matchesPresence(c.address, v)) return false;
           break;
-        case "manager_name":
-          if (!matchesPresence(c.manager_name, v)) return false;
+        case "contact_name":
+          if (!matchesPresence(c.contact_name, v)) return false;
           break;
-        case "owner_name":
-          if (!matchesPresence(c.owner_name, v)) return false;
+        case "contact_address":
+          if (!matchesPresence(c.contact_address, v)) return false;
+          break;
+        case "contact_method":
+          if (!matchesPresence(c.contact_method, v)) return false;
+          break;
+        case "contact_notes":
+          if (!matchesPresence(c.contact_notes, v)) return false;
           break;
         case "pain_points": {
           const pts = (c.pain_points as string[]) ?? [];

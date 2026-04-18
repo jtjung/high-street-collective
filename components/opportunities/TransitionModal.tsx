@@ -72,17 +72,16 @@ export function TransitionModal({ opportunity, onComplete, onCancel }: Transitio
   const [followUpDate, setFollowUpDate] = useState(todayPlus1);
 
   // Sent Website → Discovery Meeting Booked
+  const existingContact = opportunity.company?.contact_name ?? null;
   const contacts = [
-    opportunity.company?.manager_name ? { value: opportunity.company.manager_name, label: `${opportunity.company.manager_name} (Manager)` } : null,
-    opportunity.company?.owner_name ? { value: opportunity.company.owner_name, label: `${opportunity.company.owner_name} (Owner)` } : null,
+    existingContact ? { value: existingContact, label: existingContact } : null,
     { value: "__other__", label: "Other..." },
   ].filter(Boolean) as { value: string; label: string }[];
 
   const [meetingContact, setMeetingContact] = useState<string>(
-    contacts.length > 1 ? contacts[0].value : "__other__"
+    existingContact ?? "__other__"
   );
   const [otherContactName, setOtherContactName] = useState("");
-  const [otherContactRole, setOtherContactRole] = useState<"manager" | "owner">("manager");
   const [meetingDate, setMeetingDate] = useState("");
   const [meetingTime, setMeetingTime] = useState("10:00");
 
@@ -126,9 +125,7 @@ export function TransitionModal({ opportunity, onComplete, onCancel }: Transitio
           await fetch(`/api/companies/${opportunity.company.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              [otherContactRole === "manager" ? "manager_name" : "owner_name"]: otherContactName.trim(),
-            }),
+            body: JSON.stringify({ contact_name: otherContactName.trim() }),
           });
         }
 
@@ -238,21 +235,9 @@ export function TransitionModal({ opportunity, onComplete, onCancel }: Transitio
                       placeholder="e.g. James Smith"
                       className="h-9"
                     />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Role</Label>
-                    <Select
-                      value={otherContactRole}
-                      onValueChange={(v) => v && setOtherContactRole(v as "manager" | "owner")}
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="owner">Owner</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <p className="text-[10px] text-muted-foreground">
+                      Will be saved to the company&apos;s contact record.
+                    </p>
                   </div>
                 </div>
               )}
