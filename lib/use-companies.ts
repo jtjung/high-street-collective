@@ -97,11 +97,16 @@ export function useCompanies() {
     []
   );
 
+  const refresh = useCallback(() => {
+    clearCompaniesCache();
+    fetchCompanies(true);
+  }, [fetchCompanies]);
+
   return {
     companies,
     loading,
     error,
-    refresh: () => fetchCompanies(true),
+    refresh,
     updateCompany,
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet.markercluster";
@@ -9,6 +9,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import type { Company } from "@/lib/use-companies";
 import { pinMarkerHtml } from "@/lib/pin-style";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   companies: Company[];
@@ -139,13 +140,36 @@ function escapeHtml(s: string): string {
 
 export function MapView(props: Props) {
   const withCoords = companiesWithCoords(props.companies);
+  const ungeocoded = props.companies.length - withCoords.length;
   const initialCenter: [number, number] =
     withCoords.length > 0
       ? [withCoords[0].latitude, withCoords[0].longitude]
       : [51.5074, -0.1278]; // London default
 
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeResult, setGeocodeResult] = useState<{
+    success: number;
+    failed: number;
+    skipped: number;
+    total: number;
+  } | null>(null);
+
+  async function runGeocode() {
+    setGeocoding(true);
+    setGeocodeResult(null);
+    try {
+      const res = await fetch("/api/companies/geocode-all", { method: "POST", body: JSON.stringify({}) });
+      const data = await res.json();
+      setGeocodeResult(data);
+    } catch {
+      setGeocodeResult(null);
+    } finally {
+      setGeocoding(false);
+    }
+  }
+
   return (
-    <div className="relative h-[70vh] min-h-[480px] w-full rounded-lg border overflow-hidden bg-muted">
+    <div className="relative h-[70vh] min-h-[480px] w-full rounded-lg border overflow-hidden bg-muted isolate">
       <MapContainer
         center={initialCenter}
         zoom={12}
@@ -158,14 +182,35 @@ export function MapView(props: Props) {
         />
         <ClusterLayer {...props} />
       </MapContainer>
+
+      {/* Floating geocode button when some companies are ungeocoded */}
+      {ungeocoded > 0 && withCoords.length > 0 && (
+        <div className="absolute bottom-4 right-4 z-[1000] flex flex-col items-end gap-2">
+          {geocodeResult && (
+            <div className="rounded-md bg-card border px-3 py-2 text-xs shadow">
+              {geocodeResult.success} geocoded · {geocodeResult.failed} failed · {geocodeResult.skipped} skipped
+            </div>
+          )}
+          <Button size="sm" disabled={geocoding} onClick={runGeocode}>
+            {geocoding ? "Geocoding…" : `Geocode ${ungeocoded} missing`}
+          </Button>
+        </div>
+      )}
+
+      {/* Full overlay when nothing is geocoded yet */}
       {props.companies.length > 0 && withCoords.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center p-6 bg-background/90">
+        <div className="absolute inset-0 flex items-center justify-center p-6 bg-background/90 z-[1000]">
           <div className="max-w-md rounded-lg border bg-card p-4 text-center text-sm">
-            <p className="font-medium mb-1">No geocoded companies yet</p>
-            <p className="text-muted-foreground text-xs">
-              Run <code className="bg-muted px-1 rounded">npx tsx scripts/geocode-companies.ts</code>{" "}
-              to backfill coordinates.
-            </p>
+            <p className="font-medium mb-2">No geocoded companies yet</p>
+            {geocodeResult ? (
+              <p className="text-muted-foreground text-xs">
+                Done: {geocodeResult.success} geocoded · {geocodeResult.failed} failed · {geocodeResult.skipped} skipped
+              </p>
+            ) : (
+              <Button size="sm" disabled={geocoding} onClick={runGeocode}>
+                {geocoding ? `Geocoding ${props.companies.length} companies…` : "Geocode all companies"}
+              </Button>
+            )}
           </div>
         </div>
       )}
