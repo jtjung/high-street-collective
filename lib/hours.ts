@@ -2,11 +2,25 @@
  * Utilities for parsing Outscraper/Google Maps working_hours JSON and
  * checking whether a business is open at a given day + time.
  *
- * Expected format (from Outscraper):
- *   { "Monday": "9:00 AM – 5:00 PM", "Tuesday": "Closed", ... }
+ * Real Outscraper format (arrays of compact lowercase strings):
+ *   { "Monday": ["Closed"],
+ *     "Tuesday": ["5-11:30pm"],
+ *     "Friday": ["12-11:30pm", "..."],   // occasionally split ranges
+ *     "Saturday": ["8am-10:30pm"],
+ *     "Sunday": ["12pm-12am"] }
  *
- * Time strings may use an en dash (–) or regular dash (-) as the separator.
- * Special values: "Open 24 hours", "Closed"
+ * Also tolerates the older docs format:
+ *   { "Monday": "9:00 AM – 5:00 PM", ... }
+ *
+ * Special values: "Open 24 hours" / "24 hours" / "Closed".
+ *
+ * Notes on the compact format:
+ * - Hyphen/en-dash separates open and close; spaces around it are optional.
+ * - AM/PM may be lowercase ("am", "pm") or uppercase; period (.) optional.
+ * - Open-time period is often omitted when it matches the close period,
+ *   e.g. "12-11:30pm" means 12 PM – 11:30 PM. When missing we inherit
+ *   from the close time.
+ * - "12pm-12am" is a valid "open until midnight" range.
  */
 
 const DAY_NAMES = [
@@ -19,19 +33,35 @@ const DAY_NAMES = [
   "Saturday",
 ] as const;
 
-/** Parse "9:00 AM", "9 AM", "12:30 PM" → minutes from midnight (0–1439). */
-function parseTime(str: string): number | null {
-  const m = str.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+type Period = "AM" | "PM";
+
+/** Parse a single time token. Period may be undefined (caller resolves). */
+function parseTimeToken(
+  str: string
+): { hours: number; minutes: number; period: Period | null } | null {
+  const m = str
+    .trim()
+    .match(/^(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?$/i);
   if (!m) return null;
-  let hours = parseInt(m[1], 10);
+  const hours = parseInt(m[1], 10);
   const minutes = m[2] ? parseInt(m[2], 10) : 0;
-  const period = m[3].toUpperCase();
-  if (period === "AM") {
-    if (hours === 12) hours = 0; // 12 AM = midnight
-  } else {
-    if (hours !== 12) hours += 12; // 12 PM = noon (no change)
+  if (hours < 0 || hours > 24) return null;
+  if (minutes < 0 || minutes > 59) return null;
+  let period: Period | null = null;
+  if (m[3]) {
+    period = /^p/i.test(m[3]) ? "PM" : "AM";
   }
-  return hours * 60 + minutes;
+  return { hours, minutes, period };
+}
+
+function tokenToMinutes(hours: number, minutes: number, period: Period): number {
+  let h = hours;
+  if (period === "AM") {
+    if (h === 12) h = 0; // 12 AM = midnight
+  } else {
+    if (h !== 12) h += 12; // 12 PM = noon (unchanged), others add 12
+  }
+  return h * 60 + minutes;
 }
 
 type ParsedRange =
@@ -41,18 +71,47 @@ type ParsedRange =
 
 function parseHoursString(value: string): ParsedRange | null {
   const v = value.trim();
-  if (/^open 24 hours$/i.test(v)) return { kind: "open24" };
+  if (!v) return null;
   if (/^closed$/i.test(v)) return { kind: "closed" };
+  if (/^(open\s+)?24\s*hours?$/i.test(v)) return { kind: "open24" };
 
-  // Split on en dash (–) or hyphen (-), allowing optional surrounding spaces
-  const parts = v.split(/\s*[–\-]\s*/);
+  // Split on en dash (–), em dash (—), or hyphen (-), optional surrounding spaces.
+  const parts = v.split(/\s*[\u2013\u2014\-]\s*/);
   if (parts.length !== 2) return null;
 
-  const openMinutes = parseTime(parts[0]);
-  const closeMinutes = parseTime(parts[1]);
-  if (openMinutes === null || closeMinutes === null) return null;
+  const openTok = parseTimeToken(parts[0]);
+  const closeTok = parseTimeToken(parts[1]);
+  if (!openTok || !closeTok) return null;
+
+  // Close MUST have a period in compact data. If missing (old spaced format
+  // might omit both — extremely rare), default to PM which is the common case.
+  const closePeriod: Period = closeTok.period ?? "PM";
+  // Open period inherits from close when omitted. Special case: "12pm-12am"
+  // has both explicit, so inheritance only triggers when open period is null.
+  const openPeriod: Period = openTok.period ?? closePeriod;
+
+  const openMinutes = tokenToMinutes(openTok.hours, openTok.minutes, openPeriod);
+  let closeMinutes = tokenToMinutes(closeTok.hours, closeTok.minutes, closePeriod);
+
+  // "12am" at end = midnight = 0 min, which would always look like a crossing.
+  // Treat 0-minute close as "24*60" (end of day) so ranges like "12pm-12am"
+  // map to noon→midnight cleanly. Only apply when open > 0.
+  if (closeMinutes === 0 && openMinutes > 0) {
+    closeMinutes = 24 * 60;
+  }
 
   return { kind: "range", openMinutes, closeMinutes };
+}
+
+/** Extract one or more hour strings for a given day (tolerate string or array). */
+function dayRaw(hours: Record<string, unknown>, dayName: string): string[] {
+  const raw = hours[dayName];
+  if (!raw) return [];
+  if (typeof raw === "string") return [raw];
+  if (Array.isArray(raw)) {
+    return raw.filter((x): x is string => typeof x === "string");
+  }
+  return [];
 }
 
 /**
@@ -76,26 +135,30 @@ export function isOpenAt(
 
   const hours = working_hours as Record<string, unknown>;
   const dayName = DAY_NAMES[day];
-  const raw = hours[dayName];
+  const rawList = dayRaw(hours, dayName);
+  if (rawList.length === 0) return false;
 
-  if (!raw || typeof raw !== "string") return false;
-
-  const parsed = parseHoursString(raw);
-  if (!parsed) return false;
-  if (parsed.kind === "closed") return false;
-  if (parsed.kind === "open24") return true;
-
-  const { openMinutes, closeMinutes } = parsed;
-
-  // Handle spans crossing midnight (e.g., "10:00 PM – 2:00 AM")
-  if (closeMinutes <= openMinutes) {
-    return (
-      minutesFromMidnight >= openMinutes || minutesFromMidnight < closeMinutes
-    );
+  // A day is "open" if any of its ranges contain the time.
+  for (const raw of rawList) {
+    const parsed = parseHoursString(raw);
+    if (!parsed) continue;
+    if (parsed.kind === "closed") continue;
+    if (parsed.kind === "open24") return true;
+    const { openMinutes, closeMinutes } = parsed;
+    if (closeMinutes <= openMinutes) {
+      if (
+        minutesFromMidnight >= openMinutes ||
+        minutesFromMidnight < closeMinutes
+      )
+        return true;
+    } else if (
+      minutesFromMidnight >= openMinutes &&
+      minutesFromMidnight < closeMinutes
+    ) {
+      return true;
+    }
   }
-  return (
-    minutesFromMidnight >= openMinutes && minutesFromMidnight < closeMinutes
-  );
+  return false;
 }
 
 /** Convenience: check if open right now. */
@@ -109,11 +172,19 @@ const DAY_NAMES_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as con
 const DISPLAY_DAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
 function formatMinutes(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
+  const total = minutes % (24 * 60); // normalize 24*60 → 0 for display
+  const h = Math.floor(total / 60);
+  const m = total % 60;
   const period = h >= 12 ? "PM" : "AM";
   const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
   return m === 0 ? `${h12} ${period}` : `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+/** Format a parsed range for display, e.g. "12 PM – 11:30 PM". */
+function formatRange(parsed: ParsedRange): string {
+  if (parsed.kind === "closed") return "Closed";
+  if (parsed.kind === "open24") return "Open 24h";
+  return `${formatMinutes(parsed.openMinutes)} – ${formatMinutes(parsed.closeMinutes)}`;
 }
 
 /**
@@ -134,43 +205,58 @@ export function openStatusLabel(
 
   const hours = working_hours as Record<string, unknown>;
   const now = new Date();
-  const todayRaw = hours[DAY_NAMES[now.getDay()]];
-  if (!todayRaw || typeof todayRaw !== "string") return null;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const todayRaw = dayRaw(hours, DAY_NAMES[now.getDay()]);
+  if (todayRaw.length === 0) return null;
 
-  const parsed = parseHoursString(todayRaw.trim());
-  if (!parsed) return null;
+  // Parse all ranges for today
+  const todayRanges = todayRaw
+    .map((s) => parseHoursString(s))
+    .filter((p): p is ParsedRange => p !== null);
+  if (todayRanges.length === 0) return null;
 
   const open = isOpenNow(working_hours);
 
   if (open) {
-    if (parsed.kind === "open24") return { open: true, label: "Open 24h" };
-    if (parsed.kind === "range")
-      return { open: true, label: `Open · closes ${formatMinutes(parsed.closeMinutes)}` };
-  } else {
-    if (
-      parsed.kind === "range" &&
-      now.getHours() * 60 + now.getMinutes() < parsed.openMinutes
-    ) {
-      return { open: false, label: `Closed · opens ${formatMinutes(parsed.openMinutes)}` };
+    // Find the range that contains "now" and report its close.
+    for (const p of todayRanges) {
+      if (p.kind === "open24") return { open: true, label: "Open 24h" };
+      if (p.kind !== "range") continue;
+      const { openMinutes, closeMinutes } = p;
+      const inside =
+        closeMinutes <= openMinutes
+          ? nowMinutes >= openMinutes || nowMinutes < closeMinutes
+          : nowMinutes >= openMinutes && nowMinutes < closeMinutes;
+      if (inside)
+        return { open: true, label: `Open · closes ${formatMinutes(closeMinutes)}` };
     }
-    for (let delta = 1; delta <= 7; delta++) {
-      const nextDay = (now.getDay() + delta) % 7;
-      const nextRaw = hours[DAY_NAMES[nextDay]];
-      if (!nextRaw || typeof nextRaw !== "string") continue;
-      const nextParsed = parseHoursString(nextRaw.trim());
-      if (!nextParsed || nextParsed.kind === "closed") continue;
-      const dayLabel = delta === 1 ? "tomorrow" : DAY_NAMES_SHORT[nextDay];
-      if (nextParsed.kind === "open24")
-        return { open: false, label: `Closed · opens ${dayLabel}` };
-      if (nextParsed.kind === "range")
-        return {
-          open: false,
-          label: `Closed · opens ${formatMinutes(nextParsed.openMinutes)} ${dayLabel}`,
-        };
-    }
-    return { open: false, label: "Closed" };
+    return { open: true, label: "Open" };
   }
-  return null;
+
+  // Not open: see if there's a later slot today
+  for (const p of todayRanges) {
+    if (p.kind === "range" && nowMinutes < p.openMinutes) {
+      return { open: false, label: `Closed · opens ${formatMinutes(p.openMinutes)}` };
+    }
+  }
+
+  // Look ahead up to 7 days
+  for (let delta = 1; delta <= 7; delta++) {
+    const nextDay = (now.getDay() + delta) % 7;
+    const nextList = dayRaw(hours, DAY_NAMES[nextDay]);
+    for (const r of nextList) {
+      const parsed = parseHoursString(r);
+      if (!parsed || parsed.kind === "closed") continue;
+      const dayLabel = delta === 1 ? "tomorrow" : DAY_NAMES_SHORT[nextDay];
+      if (parsed.kind === "open24")
+        return { open: false, label: `Closed · opens ${dayLabel}` };
+      return {
+        open: false,
+        label: `Closed · opens ${formatMinutes(parsed.openMinutes)} ${dayLabel}`,
+      };
+    }
+  }
+  return { open: false, label: "Closed" };
 }
 
 /**
@@ -179,7 +265,7 @@ export function openStatusLabel(
  */
 export function allHoursFormatted(
   working_hours: unknown
-): Array<{ day: string; hours: string }> | null {
+): Array<{ day: string; hours: string; isToday: boolean }> | null {
   if (
     !working_hours ||
     typeof working_hours !== "object" ||
@@ -188,9 +274,23 @@ export function allHoursFormatted(
     return null;
 
   const h = working_hours as Record<string, unknown>;
-  const result = DISPLAY_DAY_ORDER.map((i) => ({
-    day: DAY_NAMES_SHORT[i],
-    hours: typeof h[DAY_NAMES[i]] === "string" ? (h[DAY_NAMES[i]] as string).trim() : "—",
-  }));
+  const today = new Date().getDay();
+  const result = DISPLAY_DAY_ORDER.map((i) => {
+    const list = dayRaw(h, DAY_NAMES[i]);
+    if (list.length === 0) {
+      return { day: DAY_NAMES_SHORT[i], hours: "—", isToday: i === today };
+    }
+    const parts = list
+      .map((s) => {
+        const parsed = parseHoursString(s);
+        return parsed ? formatRange(parsed) : s.trim();
+      })
+      .filter(Boolean);
+    return {
+      day: DAY_NAMES_SHORT[i],
+      hours: parts.join(", ") || "—",
+      isToday: i === today,
+    };
+  });
   return result.some((r) => r.hours !== "—") ? result : null;
 }

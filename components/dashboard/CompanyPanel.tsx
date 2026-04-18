@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   CheckCircle,
+  Clock,
   ExternalLink,
   Globe,
   History,
@@ -33,6 +34,7 @@ import {
   Star,
   X,
 } from "lucide-react";
+import { openStatusLabel, allHoursFormatted } from "@/lib/hours";
 import { toast } from "sonner";
 import {
   OUTCOME_OPTIONS,
@@ -552,6 +554,44 @@ export function CompanyPanel({
               </div>
             )}
           </div>
+
+          {/* Working hours */}
+          {(() => {
+            const status = openStatusLabel(company.working_hours);
+            const weekHours = allHoursFormatted(company.working_hours);
+            if (!status && !weekHours) return null;
+            return (
+              <div className="border rounded-md p-2.5 bg-muted/20 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  {status ? (
+                    <span
+                      className={`text-xs font-medium ${status.open ? "text-green-600" : "text-destructive"}`}
+                    >
+                      ● {status.label}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Hours</span>
+                  )}
+                </div>
+                {weekHours && (
+                  <table className="text-[11px] w-full">
+                    <tbody>
+                      {weekHours.map(({ day, hours, isToday }) => (
+                        <tr
+                          key={day}
+                          className={isToday ? "font-medium" : "text-muted-foreground"}
+                        >
+                          <td className="pr-3 w-10 opacity-80">{day}</td>
+                          <td>{hours}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Tags */}
           {(company.subtypes?.length || company.postal_code) && (
