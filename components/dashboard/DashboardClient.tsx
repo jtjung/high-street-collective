@@ -8,6 +8,7 @@ import { CompaniesTable } from "./CompaniesTable";
 import { CompanyPanel } from "./CompanyPanel";
 import { SyncButton } from "./SyncButton";
 import { RoutePanel } from "./RoutePanel";
+import { QuickFilters } from "./QuickFilters";
 import { Input } from "@/components/ui/input";
 import { RefreshCw, Search, X, LayoutGrid, Map as MapIcon, Clock, MapPin, Loader2 } from "lucide-react";
 import { useCompanies, type Company } from "@/lib/use-companies";
@@ -482,6 +483,15 @@ export function DashboardClient() {
               <span className="hidden sm:inline">Map</span>
             </button>
           </div>
+        </div>
+
+        {/* Desktop: quick-filter chips for the most common columns */}
+        <div className="hidden md:block mt-2">
+          <QuickFilters
+            companies={companies}
+            columnFilters={columnFilters}
+            onFiltersChange={setColumnFilters}
+          />
         </div>
       </div>
 
