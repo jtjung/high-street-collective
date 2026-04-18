@@ -41,9 +41,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 import {
   ArrowDown,
   ArrowUp,
+  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -53,8 +56,10 @@ import {
   Columns3,
   ExternalLink,
   GripVertical,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
-import { outcomeLabel, painPointLabel, userGoalLabel } from "@/lib/outcomes";
+import { outcomeLabel, painPointLabel, userGoalLabel, OUTCOME_OPTIONS } from "@/lib/outcomes";
 import type { Company } from "@/lib/use-companies";
 
 const OUTCOME_COLORS: Record<string, string> = {
@@ -99,6 +104,94 @@ const COLUMN_LABELS: Record<string, string> = {
   manager_name: "Manager",
   owner_name: "Owner / Landlord",
   user_goals: "Goals",
+};
+
+type FilterConfig =
+  | { type: "select"; options: { value: string; label: string }[] }
+  | { type: "text" };
+
+const COLUMN_FILTER_CONFIGS: Partial<Record<string, FilterConfig>> = {
+  verified: {
+    type: "select",
+    options: [
+      { value: "__all__", label: "All" },
+      { value: "true", label: "Verified only" },
+      { value: "false", label: "Not verified" },
+    ],
+  },
+  phone: {
+    type: "select",
+    options: [
+      { value: "__all__", label: "All" },
+      { value: "__nonempty__", label: "Has phone" },
+      { value: "__empty__", label: "No phone" },
+    ],
+  },
+  email: {
+    type: "select",
+    options: [
+      { value: "__all__", label: "All" },
+      { value: "__nonempty__", label: "Has email" },
+      { value: "__empty__", label: "No email" },
+    ],
+  },
+  website: {
+    type: "select",
+    options: [
+      { value: "__all__", label: "All" },
+      { value: "__nonempty__", label: "Has website" },
+      { value: "__empty__", label: "No website" },
+    ],
+  },
+  outcomes: {
+    type: "select",
+    options: [
+      { value: "__all__", label: "All" },
+      { value: "__uncalled__", label: "Uncalled only" },
+      { value: "__any__", label: "Called (any)" },
+      ...OUTCOME_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
+    ],
+  },
+  last_reached_out: {
+    type: "select",
+    options: [
+      { value: "__all__", label: "All" },
+      { value: "__nonempty__", label: "Has been reached" },
+      { value: "__empty__", label: "Never reached" },
+    ],
+  },
+  callback_at: {
+    type: "select",
+    options: [
+      { value: "__all__", label: "All" },
+      { value: "__nonempty__", label: "Has callback" },
+      { value: "__empty__", label: "No callback" },
+    ],
+  },
+  call_count: {
+    type: "select",
+    options: [
+      { value: "__all__", label: "All" },
+      { value: "__any__", label: "Has calls (> 0)" },
+      { value: "__zero__", label: "No calls" },
+    ],
+  },
+  rating: {
+    type: "select",
+    options: [
+      { value: "__all__", label: "All" },
+      { value: "__nonempty__", label: "Has rating" },
+      { value: "__empty__", label: "No rating" },
+    ],
+  },
+  reviews: {
+    type: "select",
+    options: [
+      { value: "__all__", label: "All" },
+      { value: "__nonempty__", label: "Has reviews" },
+      { value: "__empty__", label: "No reviews" },
+    ],
+  },
 };
 
 function useLocalStorageState<T>(key: string, initial: T) {
@@ -363,6 +456,11 @@ export function CompaniesTable({
             <span className="text-muted-foreground">—</span>
           ),
         size: 50,
+        filterFn: (row, id, value) => {
+          if (value === "true") return row.getValue(id) === true;
+          if (value === "false") return row.getValue(id) !== true;
+          return true;
+        },
       },
       {
         accessorKey: "phone",
@@ -384,6 +482,12 @@ export function CompaniesTable({
           );
         },
         size: 140,
+        filterFn: (row, id, value) => {
+          const v = row.getValue(id) as string | null;
+          if (value === "__empty__") return !v;
+          if (value === "__nonempty__") return !!v;
+          return v ? v.includes(String(value)) : false;
+        },
       },
       {
         accessorKey: "email",
@@ -483,6 +587,7 @@ export function CompaniesTable({
         ),
         size: 50,
         enableSorting: false,
+        enableColumnFilter: false,
       },
       {
         accessorKey: "facebook",
@@ -497,6 +602,7 @@ export function CompaniesTable({
         ),
         size: 50,
         enableSorting: false,
+        enableColumnFilter: false,
       },
       {
         accessorKey: "linkedin",
@@ -511,6 +617,7 @@ export function CompaniesTable({
         ),
         size: 50,
         enableSorting: false,
+        enableColumnFilter: false,
       },
       {
         accessorKey: "x_twitter",
@@ -525,6 +632,7 @@ export function CompaniesTable({
         ),
         size: 50,
         enableSorting: false,
+        enableColumnFilter: false,
       },
       {
         accessorKey: "youtube",
@@ -539,6 +647,7 @@ export function CompaniesTable({
         ),
         size: 50,
         enableSorting: false,
+        enableColumnFilter: false,
       },
       {
         accessorKey: "address",
@@ -600,6 +709,12 @@ export function CompaniesTable({
         ),
         size: 120,
         sortingFn: "datetime",
+        filterFn: (row, id, value) => {
+          const v = row.getValue(id) as string | null;
+          if (value === "__empty__") return !v;
+          if (value === "__nonempty__") return !!v;
+          return true;
+        },
       },
       {
         accessorKey: "callback_at",
@@ -611,6 +726,12 @@ export function CompaniesTable({
         },
         size: 100,
         sortingFn: "datetime",
+        filterFn: (row, id, value) => {
+          const v = row.getValue(id) as string | null;
+          if (value === "__empty__") return !v;
+          if (value === "__nonempty__") return !!v;
+          return true;
+        },
       },
       {
         accessorKey: "pain_points",
@@ -630,6 +751,12 @@ export function CompaniesTable({
         },
         size: 200,
         enableSorting: false,
+        filterFn: (row, id, value) => {
+          const pts = (row.getValue(id) as string[] | null) ?? [];
+          return pts.some((p) =>
+            painPointLabel(p).toLowerCase().includes(String(value).toLowerCase())
+          );
+        },
       },
       {
         accessorKey: "latest_note_content",
@@ -655,6 +782,12 @@ export function CompaniesTable({
           return <span className="text-xs font-mono">{count || "—"}</span>;
         },
         size: 60,
+        filterFn: (row, id, value) => {
+          const n = (row.getValue(id) as number) ?? 0;
+          if (value === "__any__") return n > 0;
+          if (value === "__zero__") return n === 0;
+          return true;
+        },
       },
       {
         accessorKey: "rating",
@@ -669,6 +802,12 @@ export function CompaniesTable({
           );
         },
         size: 70,
+        filterFn: (row, id, value) => {
+          const r = row.getValue(id) as number | null;
+          if (value === "__empty__") return !r;
+          if (value === "__nonempty__") return !!r;
+          return true;
+        },
       },
       {
         accessorKey: "reviews",
@@ -679,6 +818,12 @@ export function CompaniesTable({
           return <span className="text-xs">{n.toLocaleString()}</span>;
         },
         size: 80,
+        filterFn: (row, id, value) => {
+          const n = row.getValue(id) as number | null;
+          if (value === "__empty__") return !n;
+          if (value === "__nonempty__") return !!n;
+          return true;
+        },
       },
       {
         accessorKey: "manager_name",
@@ -718,6 +863,12 @@ export function CompaniesTable({
         },
         size: 200,
         enableSorting: false,
+        filterFn: (row, id, value) => {
+          const goals = (row.getValue(id) as string[] | null) ?? [];
+          return goals.some((g) =>
+            userGoalLabel(g).toLowerCase().includes(String(value).toLowerCase())
+          );
+        },
       },
     ],
     [onPhoneClick, onTypeClick]
@@ -949,8 +1100,130 @@ export function CompaniesTable({
         )}
       </div>
 
-      {/* Desktop: column picker + reset */}
+      {/* Desktop: filter, sort, column picker */}
       <div className="hidden md:flex items-center justify-end gap-2">
+        {/* Filter */}
+        <Popover>
+          <PopoverTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Filter
+            {columnFilters.length > 0 && (
+              <span className="ml-0.5 text-[10px] font-semibold bg-primary text-primary-foreground rounded-full w-4 h-4 inline-flex items-center justify-center leading-none">
+                {columnFilters.length}
+              </span>
+            )}
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-72 p-3 max-h-[28rem] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b">
+              <span className="text-xs font-semibold">Filters</span>
+              {columnFilters.length > 0 && (
+                <button
+                  onClick={() => table.resetColumnFilters()}
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+            <div className="space-y-3">
+              {table
+                .getAllLeafColumns()
+                .filter((c) => c.getIsVisible() && c.getCanFilter())
+                .map((column) => {
+                  const config = COLUMN_FILTER_CONFIGS[column.id];
+                  const value = column.getFilterValue();
+                  const label = COLUMN_LABELS[column.id] ?? column.id;
+                  return (
+                    <div key={column.id} className="space-y-1">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {label}
+                      </p>
+                      {config?.type === "select" ? (
+                        <Select
+                          value={(value as string) ?? "__all__"}
+                          onValueChange={(v) =>
+                            column.setFilterValue(v === "__all__" ? undefined : v)
+                          }
+                        >
+                          <SelectTrigger className="h-7 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {config.options.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="relative">
+                          <Input
+                            value={(value as string) ?? ""}
+                            onChange={(e) =>
+                              column.setFilterValue(e.target.value || undefined)
+                            }
+                            placeholder="Filter..."
+                            className="h-7 text-xs pr-7"
+                          />
+                          {!!value && (
+                            <button
+                              onClick={() => column.setFilterValue(undefined)}
+                              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Sort */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            {sorting.length > 0
+              ? `${COLUMN_LABELS[sorting[0].id] ?? sorting[0].id} ${sorting[0].desc ? "↓" : "↑"}`
+              : "Sort"}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto w-52">
+            {table
+              .getAllLeafColumns()
+              .filter((c) => c.getIsVisible() && c.getCanSort())
+              .map((column) => {
+                const sorted = column.getIsSorted();
+                const label = COLUMN_LABELS[column.id] ?? column.id;
+                return (
+                  <DropdownMenuItem
+                    key={column.id}
+                    onClick={() => {
+                      const current = sorting.find((s) => s.id === column.id);
+                      if (!current) {
+                        onSortingChange([{ id: column.id, desc: false }]);
+                      } else if (!current.desc) {
+                        onSortingChange([{ id: column.id, desc: true }]);
+                      } else {
+                        onSortingChange([]);
+                      }
+                    }}
+                    className={`flex items-center gap-2 ${sorted ? "bg-accent" : ""}`}
+                  >
+                    <span className="flex-1 text-xs">{label}</span>
+                    {sorted === "asc" && <ArrowUp className="h-3 w-3 shrink-0" />}
+                    {sorted === "desc" && <ArrowDown className="h-3 w-3 shrink-0" />}
+                    {!sorted && <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-20" />}
+                  </DropdownMenuItem>
+                );
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Columns */}
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors cursor-pointer">
             <Columns3 className="h-3.5 w-3.5" />

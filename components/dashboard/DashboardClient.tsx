@@ -9,16 +9,8 @@ import { CompanyPanel } from "./CompanyPanel";
 import { SyncButton } from "./SyncButton";
 import { RoutePanel } from "./RoutePanel";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { RefreshCw, Search, X, LayoutGrid, Map as MapIcon, Clock } from "lucide-react";
 import { useCompanies, type Company } from "@/lib/use-companies";
-import { OUTCOME_OPTIONS } from "@/lib/outcomes";
 import { NavTabs } from "@/components/NavTabs";
 import { applyFilters } from "@/lib/filter-predicate";
 import { isOpenAt } from "@/lib/hours";
@@ -64,36 +56,6 @@ function useLocalState<T>(key: string, initial: T) {
   return [value, set] as const;
 }
 
-// Options used in the top control bar
-const WEBSITE_FILTER_OPTIONS = [
-  { value: "__all__", label: "All websites" },
-  { value: "__empty__", label: "No website" },
-  { value: "__nonempty__", label: "Has website" },
-];
-
-const EMAIL_FILTER_OPTIONS = [
-  { value: "__all__", label: "All emails" },
-  { value: "__empty__", label: "No email" },
-  { value: "__nonempty__", label: "Has email" },
-];
-
-const OUTCOME_FILTER_OPTIONS = [
-  { value: "__all__", label: "All companies" },
-  { value: "__uncalled__", label: "Uncalled only" },
-  { value: "__any__", label: "Called (any outcome)" },
-  ...OUTCOME_OPTIONS.map((o) => ({ value: o.label, label: o.label })),
-];
-
-const SORT_OPTIONS = [
-  { value: "postal_code:asc", label: "Postal code A→Z" },
-  { value: "postal_code:desc", label: "Postal code Z→A" },
-  { value: "name:asc", label: "Name A→Z" },
-  { value: "name:desc", label: "Name Z→A" },
-  { value: "last_reached_out:desc", label: "Most recently reached" },
-  { value: "last_reached_out:asc", label: "Least recently reached" },
-  { value: "callback_at:asc", label: "Callback soonest" },
-  { value: "callback_at:desc", label: "Callback latest" },
-];
 
 export function DashboardClient() {
   const { companies, loading, refresh, updateCompany } = useCompanies();
@@ -212,77 +174,6 @@ export function DashboardClient() {
     [setColumnFilters]
   );
 
-  // Derive control-bar values from columnFilters/sorting
-  const websiteFilter = useMemo(() => {
-    const f = columnFilters.find((f) => f.id === "website");
-    return (f?.value as string) ?? "__all__";
-  }, [columnFilters]);
-
-  const emailFilter = useMemo(() => {
-    const f = columnFilters.find((f) => f.id === "email");
-    return (f?.value as string) ?? "__all__";
-  }, [columnFilters]);
-
-  const outcomeFilter = useMemo(() => {
-    const f = columnFilters.find((f) => f.id === "outcomes");
-    return (f?.value as string) ?? "__all__";
-  }, [columnFilters]);
-
-  const typeFilter = useMemo(() => {
-    const f = columnFilters.find((f) => f.id === "subtypes");
-    return f?.value as string | undefined;
-  }, [columnFilters]);
-
-  const clearTypeFilter = useCallback(() => {
-    setColumnFilters((prev) => prev.filter((f) => f.id !== "subtypes"));
-  }, [setColumnFilters]);
-
-  const sortValue = useMemo(() => {
-    if (sorting.length === 0) return "postal_code:asc";
-    const s = sorting[0];
-    return `${s.id}:${s.desc ? "desc" : "asc"}`;
-  }, [sorting]);
-
-  const setWebsiteFilter = useCallback(
-    (value: string) => {
-      setColumnFilters((prev) => {
-        const rest = prev.filter((f) => f.id !== "website");
-        if (value === "__all__") return rest;
-        return [...rest, { id: "website", value }];
-      });
-    },
-    [setColumnFilters]
-  );
-
-  const setEmailFilter = useCallback(
-    (value: string) => {
-      setColumnFilters((prev) => {
-        const rest = prev.filter((f) => f.id !== "email");
-        if (value === "__all__") return rest;
-        return [...rest, { id: "email", value }];
-      });
-    },
-    [setColumnFilters]
-  );
-
-  const setOutcomeFilter = useCallback(
-    (value: string) => {
-      setColumnFilters((prev) => {
-        const rest = prev.filter((f) => f.id !== "outcomes");
-        if (value === "__all__") return rest;
-        return [...rest, { id: "outcomes", value }];
-      });
-    },
-    [setColumnFilters]
-  );
-
-  const setSort = useCallback(
-    (value: string) => {
-      const [id, dir] = value.split(":");
-      setSorting([{ id, desc: dir === "desc" }]);
-    },
-    [setSorting]
-  );
 
   const clearAll = useCallback(() => {
     undoStack.current.push({ columnFilters, sorting });
@@ -454,60 +345,6 @@ export function DashboardClient() {
             />
           </div>
 
-          <Select
-            value={websiteFilter}
-            onValueChange={(v) => v && setWebsiteFilter(v)}
-          >
-            <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-40 text-sm">
-              <SelectValue>
-                {WEBSITE_FILTER_OPTIONS.find((o) => o.value === websiteFilter)?.label ?? websiteFilter}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {WEBSITE_FILTER_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={emailFilter}
-            onValueChange={(v) => v && setEmailFilter(v)}
-          >
-            <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-36 text-sm">
-              <SelectValue>
-                {EMAIL_FILTER_OPTIONS.find((o) => o.value === emailFilter)?.label ?? emailFilter}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {EMAIL_FILTER_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={outcomeFilter}
-            onValueChange={(v) => v && setOutcomeFilter(v)}
-          >
-            <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-48 text-sm">
-              <SelectValue>
-                {OUTCOME_FILTER_OPTIONS.find((o) => o.value === outcomeFilter)?.label ?? outcomeFilter}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {OUTCOME_FILTER_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           {/* Open-at filter */}
           {openAtTime ? (
             <div className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-primary/10 border border-primary/30">
@@ -535,32 +372,6 @@ export function DashboardClient() {
             >
               <Clock className="h-3.5 w-3.5" />
               Open now
-            </button>
-          )}
-
-          <Select value={sortValue} onValueChange={(v) => v && setSort(v)}>
-            <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-52 text-sm">
-              <SelectValue>
-                {SORT_OPTIONS.find((o) => o.value === sortValue)?.label ?? sortValue}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {SORT_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {typeFilter && (
-            <button
-              onClick={clearTypeFilter}
-              className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:opacity-80"
-              title="Remove type filter"
-            >
-              Type: {typeFilter}
-              <X className="h-3 w-3" />
             </button>
           )}
 
