@@ -16,11 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RefreshCw, Search, X, LayoutGrid, Map as MapIcon } from "lucide-react";
+import { RefreshCw, Search, X, LayoutGrid, Map as MapIcon, Clock } from "lucide-react";
 import { useCompanies, type Company } from "@/lib/use-companies";
 import { OUTCOME_OPTIONS } from "@/lib/outcomes";
 import { NavTabs } from "@/components/NavTabs";
 import { applyFilters } from "@/lib/filter-predicate";
+import { isOpenAt } from "@/lib/hours";
 import { toast } from "sonner";
 
 const MapView = dynamic(
@@ -111,6 +112,18 @@ export function DashboardClient() {
     VIEW_MODE_KEY,
     "table"
   );
+
+  // Open-at filter — not persisted (day-of-week must stay current)
+  // time is "HH:MM" in 24-hour format; null = filter off
+  const [openAtTime, setOpenAtTime] = useState<string | null>(null);
+
+  // Derive { day, minutes } from openAtTime (always uses today's day of week)
+  const openAtParam = useMemo((): { day: number; minutes: number } | null => {
+    if (!openAtTime) return null;
+    const [h, m] = openAtTime.split(":").map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    return { day: new Date().getDay(), minutes: h * 60 + m };
+  }, [openAtTime]);
 
   // Map view state — not persisted
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -277,15 +290,38 @@ export function DashboardClient() {
     setSearch("");
     setColumnFiltersRaw([]);
     setSortingRaw([{ id: "postal_code", desc: false }]);
+    setOpenAtTime(null);
   }, [columnFilters, sorting, setColumnFiltersRaw, setSortingRaw]);
 
   const hasFiltersApplied =
-    search.length > 0 || columnFilters.length > 0;
+    search.length > 0 || columnFilters.length > 0 || openAtTime !== null;
+
+  const enableOpenNow = useCallback(() => {
+    const now = new Date();
+    const h = now.getHours().toString().padStart(2, "0");
+    const m = now.getMinutes().toString().padStart(2, "0");
+    setOpenAtTime(`${h}:${m}`);
+  }, []);
+
+  const disableOpenAt = useCallback(() => setOpenAtTime(null), []);
+
+  // Pre-filter by open-at before passing to both table and map.
+  // The table handles all other column filters internally; this just narrows
+  // the dataset when the open-at filter is active.
+  const openAtFiltered = useMemo(
+    () =>
+      openAtParam
+        ? companies.filter((c) =>
+            isOpenAt(c.working_hours, openAtParam.day, openAtParam.minutes)
+          )
+        : companies,
+    [companies, openAtParam]
+  );
 
   // Map view — filtered companies (same predicate as table, applied eagerly)
   const filteredCompanies = useMemo(
-    () => applyFilters(companies, columnFilters, search),
-    [companies, columnFilters, search]
+    () => applyFilters(openAtFiltered, columnFilters, search),
+    [openAtFiltered, columnFilters, search]
   );
 
   const selectedCompanies = useMemo(
@@ -472,6 +508,36 @@ export function DashboardClient() {
             </SelectContent>
           </Select>
 
+          {/* Open-at filter */}
+          {openAtTime ? (
+            <div className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-primary/10 border border-primary/30">
+              <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span className="text-primary font-medium whitespace-nowrap">Open at</span>
+              <input
+                type="time"
+                value={openAtTime}
+                onChange={(e) => setOpenAtTime(e.target.value)}
+                className="h-5 w-[5.5rem] bg-transparent text-xs text-primary border-none outline-none focus:ring-0 cursor-text"
+              />
+              <button
+                onClick={disableOpenAt}
+                className="text-primary/70 hover:text-primary ml-0.5"
+                aria-label="Remove open-at filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={enableOpenNow}
+              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs border rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground whitespace-nowrap"
+              title="Filter to businesses open right now"
+            >
+              <Clock className="h-3.5 w-3.5" />
+              Open now
+            </button>
+          )}
+
           <Select value={sortValue} onValueChange={(v) => v && setSort(v)}>
             <SelectTrigger className="h-9 flex-1 min-w-0 sm:flex-none sm:w-52 text-sm">
               <SelectValue>
@@ -541,7 +607,7 @@ export function DashboardClient() {
       <div className="p-2 sm:p-4">
         {viewMode === "table" ? (
           <CompaniesTable
-            companies={companies}
+            companies={openAtFiltered}
             loading={loading}
             globalFilter={search}
             columnFilters={columnFilters}
