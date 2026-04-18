@@ -27,17 +27,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
   }
 
-  const parts = [company.address, company.postal_code, company.city].filter(
-    Boolean
-  );
-  if (parts.length === 0) {
+  const query =
+    company.address ||
+    [company.postal_code, company.city].filter(Boolean).join(", ");
+  if (!query) {
     return NextResponse.json(
       { error: "Company has no address data" },
       { status: 400 }
     );
   }
 
-  const result = await geocodeAddress(parts.join(", "), {
+  const result = await geocodeAddress(query, {
     countryCode: (company.country_code ?? "gb").toLowerCase(),
   });
 

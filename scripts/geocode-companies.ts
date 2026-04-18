@@ -38,9 +38,12 @@ function buildQuery(c: {
   postal_code: string | null;
   city: string | null;
 }): string | null {
-  const parts = [c.address, c.postal_code, c.city].filter(Boolean);
-  if (parts.length === 0) return null;
-  return parts.join(", ");
+  // Addresses from Outscraper already include postal code + city
+  // (e.g. "147 Stroud Green Rd, Finsbury Park, London N4 3PZ").
+  // Duplicating them confuses Nominatim and returns no match.
+  if (c.address) return c.address;
+  const parts = [c.postal_code, c.city].filter(Boolean);
+  return parts.length ? parts.join(", ") : null;
 }
 
 async function main() {

@@ -571,6 +571,13 @@ export function DashboardClient() {
             <RoutePanel
               allVisibleCount={visibleInMap.length}
               totalCount={filteredCompanies.length}
+              ungeocodedCount={
+                filteredCompanies.filter(
+                  (c) =>
+                    typeof c.latitude !== "number" ||
+                    typeof c.longitude !== "number"
+                ).length
+              }
               selected={selectedCompanies}
               orderedIds={orderedIds}
               optimizing={optimizing}

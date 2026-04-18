@@ -8,6 +8,7 @@ import { buildGoogleMapsRouteLink } from "@/lib/route-link";
 type Props = {
   allVisibleCount: number;
   totalCount: number;
+  ungeocodedCount: number;
   selected: Company[];
   orderedIds: string[] | null;
   optimizing: boolean;
@@ -21,6 +22,7 @@ type Props = {
 export function RoutePanel({
   allVisibleCount,
   totalCount,
+  ungeocodedCount,
   selected,
   orderedIds,
   optimizing,
@@ -54,6 +56,12 @@ export function RoutePanel({
         <p className="text-xs text-muted-foreground">
           {allVisibleCount.toLocaleString()} in view · {totalCount.toLocaleString()} total
         </p>
+        {ungeocodedCount > 0 && (
+          <p className="text-[11px] text-amber-600 mt-0.5">
+            {ungeocodedCount.toLocaleString()} not yet geocoded — run{" "}
+            <code className="bg-muted px-1 rounded">scripts/geocode-companies.ts</code> to populate.
+          </p>
+        )}
         <h2 className="text-sm font-semibold mt-0.5">
           Selected ({selected.length})
         </h2>
