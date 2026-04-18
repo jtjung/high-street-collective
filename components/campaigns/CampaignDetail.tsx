@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { UserButton } from "@clerk/nextjs";
@@ -22,20 +23,22 @@ import {
   ChevronUp,
   Navigation,
   Map as MapIcon,
+  Pencil,
+  X,
 } from "lucide-react";
 import { NavTabs } from "@/components/NavTabs";
 import type { Tables } from "@/lib/supabase/types";
 import { useRouter } from "next/navigation";
-import { OUTCOME_OPTIONS, outcomeLabel } from "@/lib/outcomes";
+import { OUTCOME_OPTIONS, outcomeLabel, FOLLOW_UP_METHODS } from "@/lib/outcomes";
+import { nextOpenLabel, allHoursFormatted } from "@/lib/hours";
+import type { Contact } from "@/lib/use-companies";
+
+const CampaignMap = dynamic(
+  () => import("./CampaignMap").then((m) => ({ default: m.CampaignMap })),
+  { ssr: false }
+);
 
 type Campaign = Tables<"campaigns">;
-
-type ContactLite = {
-  name: string | null;
-  email: string | null;
-  phone: string | null;
-  notes?: string | null;
-};
 
 type MemberCompany = Pick<
   Tables<"companies">,
@@ -57,8 +60,12 @@ type MemberCompany = Pick<
   | "longitude"
   | "location_link"
   | "prototype_url"
+  | "working_hours"
+  | "callback_at"
+  | "calendar_event_id"
+  | "follow_up_method"
 > & {
-  contact: ContactLite | null;
+  contact: { name: string | null; email: string | null; phone: string | null; notes?: string | null } | null;
 };
 
 type Member = {
@@ -75,13 +82,24 @@ type NoteRow = {
 
 type ExpandState = {
   outcomes: string[];
-  contactName: string;
-  contactEmail: string;
-  contactPhone: string;
+  followUpMethod: string;
+  callbackDate: Date | undefined;
+  callbackTime: string;
+  schedulingCallback: boolean;
+  cancellingCallback: boolean;
+  editingNoteId: string | null;
+  editingNoteContent: string;
+  contacts: Contact[];
+  loadingContacts: boolean;
+  showAddContact: boolean;
+  editingContactId: string | null;
+  contactFormName: string;
+  contactFormEmail: string;
+  contactFormPhone: string;
+  contactFormNotes: string;
   noteInput: string;
   notes: NoteRow[];
   loadingNotes: boolean;
-  savingContact: boolean;
   savingOutcome: boolean;
   postingNote: boolean;
 };
@@ -245,6 +263,16 @@ export function CampaignDetail({ id }: { id: string }) {
     }
   }, [members]);
 
+  const patchState = useCallback(
+    (companyId: string, patch: Partial<ExpandState>) => {
+      setExpandStates((prev) => ({
+        ...prev,
+        [companyId]: { ...prev[companyId], ...patch },
+      }));
+    },
+    []
+  );
+
   const toggleExpand = useCallback(
     async (companyId: string, company: MemberCompany) => {
       if (expandedId === companyId) {
@@ -255,13 +283,26 @@ export function CampaignDetail({ id }: { id: string }) {
       if (!expandStates[companyId]) {
         const init: ExpandState = {
           outcomes: company.outcomes ?? [],
-          contactName: company.contact?.name ?? "",
-          contactEmail: company.contact?.email ?? "",
-          contactPhone: company.contact?.phone ?? "",
+          followUpMethod: company.follow_up_method ?? "",
+          callbackDate: company.callback_at ? new Date(company.callback_at) : undefined,
+          callbackTime: company.callback_at
+            ? `${String(new Date(company.callback_at).getHours()).padStart(2, "0")}:${String(new Date(company.callback_at).getMinutes()).padStart(2, "0")}`
+            : "10:00",
+          schedulingCallback: false,
+          cancellingCallback: false,
+          editingNoteId: null,
+          editingNoteContent: "",
+          contacts: company.contact ? [company.contact as Contact] : [],
+          loadingContacts: true,
+          showAddContact: false,
+          editingContactId: null,
+          contactFormName: "",
+          contactFormEmail: "",
+          contactFormPhone: "",
+          contactFormNotes: "",
           noteInput: "",
           notes: [],
           loadingNotes: true,
-          savingContact: false,
           savingOutcome: false,
           postingNote: false,
         };
@@ -279,19 +320,21 @@ export function CampaignDetail({ id }: { id: string }) {
             [companyId]: { ...prev[companyId], loadingNotes: false },
           }));
         }
+        fetch(`/api/companies/${companyId}/contact`)
+          .then(r => r.json())
+          .then((d: { contacts: Contact[] }) => {
+            setExpandStates((prev) => ({
+              ...prev,
+              [companyId]: { ...prev[companyId], contacts: d.contacts, loadingContacts: false },
+            }));
+          })
+          .catch(() => setExpandStates((prev) => ({
+            ...prev,
+            [companyId]: { ...prev[companyId], loadingContacts: false },
+          })));
       }
     },
     [expandedId, expandStates]
-  );
-
-  const patchState = useCallback(
-    (companyId: string, patch: Partial<ExpandState>) => {
-      setExpandStates((prev) => ({
-        ...prev,
-        [companyId]: { ...prev[companyId], ...patch },
-      }));
-    },
-    []
   );
 
   const toggleOutcome = useCallback(
@@ -328,38 +371,137 @@ export function CampaignDetail({ id }: { id: string }) {
     [expandStates, patchState]
   );
 
-  const saveContact = useCallback(
+  const addContact = useCallback(
     async (companyId: string) => {
       const state = expandStates[companyId];
       if (!state) return;
-      patchState(companyId, { savingContact: true });
+      const payload = { name: state.contactFormName || null, email: state.contactFormEmail || null, phone: state.contactFormPhone || null, notes: state.contactFormNotes || null };
       try {
-        const payload = {
-          name: state.contactName || null,
-          email: state.contactEmail || null,
-          phone: state.contactPhone || null,
-        };
-        const res = await fetch(`/api/companies/${companyId}/contact`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        const res = await fetch(`/api/companies/${companyId}/contact`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         if (!res.ok) throw new Error("Failed");
-        setMembers((prev) =>
-          prev.map((m) =>
-            m.company?.id === companyId
-              ? { ...m, company: { ...m.company!, contact: payload } }
-              : m
-          )
-        );
-        toast.success("Contact saved");
-      } catch {
-        toast.error("Failed to save contact");
-      } finally {
-        patchState(companyId, { savingContact: false });
-      }
+        const saved = (await res.json()) as Contact;
+        patchState(companyId, { contacts: [...state.contacts, saved], showAddContact: false, contactFormName: "", contactFormEmail: "", contactFormPhone: "", contactFormNotes: "" });
+        toast.success("Contact added");
+      } catch { toast.error("Failed to add contact"); }
     },
     [expandStates, patchState]
+  );
+
+  const updateContact = useCallback(
+    async (companyId: string) => {
+      const state = expandStates[companyId];
+      if (!state || !state.editingContactId) return;
+      const payload = { name: state.contactFormName || null, email: state.contactFormEmail || null, phone: state.contactFormPhone || null, notes: state.contactFormNotes || null };
+      try {
+        const res = await fetch(`/api/companies/${companyId}/contact?id=${state.editingContactId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        if (!res.ok) throw new Error("Failed");
+        const saved = (await res.json()) as Contact;
+        patchState(companyId, { contacts: state.contacts.map(c => c.id === state.editingContactId ? saved : c), showAddContact: false, editingContactId: null });
+        toast.success("Contact saved");
+      } catch { toast.error("Failed to save contact"); }
+    },
+    [expandStates, patchState]
+  );
+
+  const deleteContact = useCallback(
+    async (companyId: string, contactId: string) => {
+      const state = expandStates[companyId];
+      if (!state) return;
+      try {
+        const res = await fetch(`/api/companies/${companyId}/contact?id=${contactId}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Failed");
+        patchState(companyId, { contacts: state.contacts.filter(c => c.id !== contactId) });
+      } catch { toast.error("Failed to delete contact"); }
+    },
+    [expandStates, patchState]
+  );
+
+  const updateNote = useCallback(
+    async (companyId: string) => {
+      const state = expandStates[companyId];
+      if (!state || !state.editingNoteId || !state.editingNoteContent.trim()) return;
+      try {
+        const res = await fetch(`/api/companies/${companyId}/notes`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ noteId: state.editingNoteId, content: state.editingNoteContent.trim() }) });
+        if (!res.ok) throw new Error("Failed");
+        const updated = (await res.json()) as NoteRow;
+        patchState(companyId, { notes: state.notes.map(n => n.id === state.editingNoteId ? updated : n), editingNoteId: null, editingNoteContent: "" });
+      } catch { toast.error("Failed to save note"); }
+    },
+    [expandStates, patchState]
+  );
+
+  const scheduleFollowUp = useCallback(
+    async (companyId: string, company: MemberCompany) => {
+      const state = expandStates[companyId];
+      if (!state || !state.callbackDate) return;
+      patchState(companyId, { schedulingCallback: true });
+      try {
+        const [hh, mm] = state.callbackTime.split(":").map(Number);
+        const dt = new Date(state.callbackDate);
+        dt.setHours(hh, mm, 0, 0);
+        const existingEventId = company.calendar_event_id;
+        const isUpdate = !!existingEventId;
+        let location: string | null = null;
+        const primaryContact = state.contacts[0] ?? null;
+        if (state.followUpMethod === "in_person") location = company.address ?? null;
+        else if (state.followUpMethod === "email") location = primaryContact?.email || company.email || null;
+        else if (state.followUpMethod === "phone") location = primaryContact?.phone || company.phone || null;
+
+        const calRes = await fetch("/api/calendar/event", {
+          method: isUpdate ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...(isUpdate ? { eventId: existingEventId } : {}),
+            companyName: company.name, phone: company.phone, address: company.address, location,
+            method: state.followUpMethod || null, startTime: dt.toISOString(),
+            notes: state.notes.map(n => ({ content: n.content, created_at: n.created_at, user_name: n.user_name })),
+            contact: primaryContact ? { name: primaryContact.name, email: primaryContact.email, phone: primaryContact.phone } : null,
+          }),
+        });
+        let calendarEventId: string | null = existingEventId ?? null;
+        if (calRes.ok) { const calData = (await calRes.json()) as { eventId?: string }; calendarEventId = calData.eventId ?? calendarEventId; }
+
+        await fetch(`/api/companies/${companyId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ callback_at: dt.toISOString(), calendar_event_id: calendarEventId }) });
+
+        if (!state.outcomes.includes("follow_up")) {
+          const newOutcomes = [...state.outcomes, "follow_up"];
+          await fetch(`/api/companies/${companyId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outcomes: newOutcomes }) });
+          patchState(companyId, { outcomes: newOutcomes });
+          setMembers(prev => prev.map(m => m.company?.id === companyId ? { ...m, company: { ...m.company!, outcomes: newOutcomes, callback_at: dt.toISOString(), calendar_event_id: calendarEventId } } : m));
+        } else {
+          setMembers(prev => prev.map(m => m.company?.id === companyId ? { ...m, company: { ...m.company!, callback_at: dt.toISOString(), calendar_event_id: calendarEventId } } : m));
+        }
+        toast.success(calendarEventId ? (isUpdate ? "Follow up updated + calendar invite sent" : "Follow up scheduled + calendar invite sent") : (isUpdate ? "Follow up updated" : "Follow up scheduled"));
+      } catch { toast.error("Failed to schedule follow up"); }
+      finally { patchState(companyId, { schedulingCallback: false }); }
+    },
+    [expandStates, patchState, setMembers]
+  );
+
+  const cancelFollowUp = useCallback(
+    async (companyId: string, company: MemberCompany) => {
+      const state = expandStates[companyId];
+      if (!state) return;
+      patchState(companyId, { cancellingCallback: true });
+      try {
+        if (company.calendar_event_id) {
+          await fetch(`/api/calendar/event?eventId=${encodeURIComponent(company.calendar_event_id)}`, { method: "DELETE" });
+        }
+        await fetch(`/api/companies/${companyId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ callback_at: null, calendar_event_id: null }) });
+        const newOutcomes = state.outcomes.filter(o => o !== "follow_up");
+        if (newOutcomes.length !== state.outcomes.length) {
+          await fetch(`/api/companies/${companyId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ outcomes: newOutcomes }) });
+          patchState(companyId, { outcomes: newOutcomes, callbackDate: undefined, callbackTime: "10:00" });
+          setMembers(prev => prev.map(m => m.company?.id === companyId ? { ...m, company: { ...m.company!, outcomes: newOutcomes, callback_at: null, calendar_event_id: null } } : m));
+        } else {
+          patchState(companyId, { callbackDate: undefined, callbackTime: "10:00" });
+          setMembers(prev => prev.map(m => m.company?.id === companyId ? { ...m, company: { ...m.company!, callback_at: null, calendar_event_id: null } } : m));
+        }
+        toast.success("Follow up cancelled");
+      } catch { toast.error("Failed to cancel follow up"); }
+      finally { patchState(companyId, { cancellingCallback: false }); }
+    },
+    [expandStates, patchState, setMembers]
   );
 
   const postNote = useCallback(
@@ -537,6 +679,7 @@ export function CampaignDetail({ id }: { id: string }) {
                       <th className="text-left px-3 py-2 font-medium hidden md:table-cell">
                         Area
                       </th>
+                      <th className="text-left px-3 py-2 font-medium hidden lg:table-cell">Next Open</th>
                       <th className="text-right px-3 py-2 font-medium"></th>
                     </tr>
                   </thead>
@@ -622,6 +765,17 @@ export function CampaignDetail({ id }: { id: string }) {
                             <td className="px-3 py-2 hidden md:table-cell text-xs text-muted-foreground">
                               {company.neighborhood ?? company.area ?? "—"}
                             </td>
+                            <td className="px-3 py-2 hidden lg:table-cell text-xs">
+                              {(() => {
+                                const label = nextOpenLabel(company.working_hours);
+                                if (!label) return <span className="text-muted-foreground">—</span>;
+                                return (
+                                  <span className={label === "Open Now" ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                                    {label}
+                                  </span>
+                                );
+                              })()}
+                            </td>
                             <td className="px-3 py-2 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {company.prototype_url && (
@@ -685,7 +839,7 @@ export function CampaignDetail({ id }: { id: string }) {
                           {/* Expanded panel */}
                           {isExpanded && state && (
                             <tr key={`${company.id}-expanded`} className="border-t bg-muted/10">
-                              <td colSpan={6} className="px-4 py-4">
+                              <td colSpan={7} className="px-4 py-4">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
                                   {/* Outcomes */}
@@ -721,48 +875,61 @@ export function CampaignDetail({ id }: { id: string }) {
 
                                   {/* Contact */}
                                   <div>
-                                    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                                      Contact
+                                    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Contacts</div>
+                                    <div className="flex flex-wrap gap-1.5 items-center mb-2">
+                                      {state.contacts.map((c) => (
+                                        <div key={c.id} className="group flex items-center gap-1 bg-muted rounded-full pl-2.5 pr-1 py-0.5">
+                                          <span className="text-xs">{c.name || c.email || c.phone || "—"}</span>
+                                          <button onClick={() => patchState(company.id, { editingContactId: c.id, contactFormName: c.name ?? "", contactFormEmail: c.email ?? "", contactFormPhone: c.phone ?? "", contactFormNotes: c.notes ?? "", showAddContact: true })} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"><Pencil className="h-2.5 w-2.5" /></button>
+                                          <button onClick={() => deleteContact(company.id, c.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"><X className="h-2.5 w-2.5" /></button>
+                                        </div>
+                                      ))}
+                                      {!state.showAddContact && (
+                                        <button onClick={() => patchState(company.id, { showAddContact: true, editingContactId: null, contactFormName: "", contactFormEmail: "", contactFormPhone: "", contactFormNotes: "" })} className="text-[11px] text-primary hover:underline">+ Add</button>
+                                      )}
                                     </div>
-                                    <div className="space-y-1.5">
-                                      <input
-                                        type="text"
-                                        value={state.contactName}
-                                        onChange={(e) =>
-                                          patchState(company.id, { contactName: e.target.value })
-                                        }
-                                        placeholder="Name"
-                                        className="w-full h-7 px-2 text-xs border rounded outline-none focus:ring-1 focus:ring-primary bg-background"
-                                      />
-                                      <input
-                                        type="email"
-                                        value={state.contactEmail}
-                                        onChange={(e) =>
-                                          patchState(company.id, { contactEmail: e.target.value })
-                                        }
-                                        placeholder="Email"
-                                        className="w-full h-7 px-2 text-xs border rounded outline-none focus:ring-1 focus:ring-primary bg-background"
-                                      />
-                                      <input
-                                        type="tel"
-                                        value={state.contactPhone}
-                                        onChange={(e) =>
-                                          patchState(company.id, { contactPhone: e.target.value })
-                                        }
-                                        placeholder="Phone"
-                                        className="w-full h-7 px-2 text-xs border rounded font-mono outline-none focus:ring-1 focus:ring-primary bg-background"
-                                      />
-                                      <button
-                                        onClick={() => saveContact(company.id)}
-                                        disabled={state.savingContact}
-                                        className="w-full h-7 text-xs bg-primary text-primary-foreground rounded hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-1"
-                                      >
-                                        {state.savingContact && (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                    {state.showAddContact && (
+                                      <div className="space-y-1.5">
+                                        <input type="text" value={state.contactFormName} onChange={e => patchState(company.id, { contactFormName: e.target.value })} placeholder="Name" className="w-full h-7 px-2 text-xs border rounded outline-none focus:ring-1 focus:ring-primary bg-background" />
+                                        <input type="email" value={state.contactFormEmail} onChange={e => patchState(company.id, { contactFormEmail: e.target.value })} placeholder="Email" className="w-full h-7 px-2 text-xs border rounded outline-none focus:ring-1 focus:ring-primary bg-background" />
+                                        <input type="tel" value={state.contactFormPhone} onChange={e => patchState(company.id, { contactFormPhone: e.target.value })} placeholder="Phone" className="w-full h-7 px-2 text-xs border rounded font-mono outline-none focus:ring-1 focus:ring-primary bg-background" />
+                                        <div className="flex gap-1">
+                                          <button onClick={() => state.editingContactId ? updateContact(company.id) : addContact(company.id)} className="flex-1 h-7 text-xs bg-primary text-primary-foreground rounded hover:opacity-90">
+                                            {state.editingContactId ? "Save" : "Add contact"}
+                                          </button>
+                                          <button onClick={() => patchState(company.id, { showAddContact: false, editingContactId: null })} className="h-7 px-2 text-xs border rounded hover:bg-accent">Cancel</button>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Follow up scheduler when follow_up outcome is active */}
+                                    {state.outcomes.includes("follow_up") && (
+                                      <div className="mt-3 pt-3 border-t space-y-2">
+                                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Schedule Follow Up</div>
+                                        <div className="flex gap-1">
+                                          {FOLLOW_UP_METHODS.map((m) => (
+                                            <button key={m.value} type="button" onClick={() => patchState(company.id, { followUpMethod: state.followUpMethod === m.value ? "" : m.value })} className={`flex-1 px-1.5 py-1 text-[11px] rounded border transition-colors ${state.followUpMethod === m.value ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:bg-accent"}`}>{m.label}</button>
+                                          ))}
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <input type="date" value={state.callbackDate ? state.callbackDate.toISOString().split("T")[0] : ""} onChange={e => patchState(company.id, { callbackDate: e.target.value ? new Date(e.target.value + "T00:00") : undefined })} min={new Date().toISOString().split("T")[0]} className="flex-1 h-7 px-2 text-xs border rounded bg-background" />
+                                          <input type="time" value={state.callbackTime} onChange={e => patchState(company.id, { callbackTime: e.target.value })} className="w-24 h-7 px-2 text-xs border rounded bg-background" />
+                                        </div>
+                                        <button onClick={() => scheduleFollowUp(company.id, company)} disabled={!state.callbackDate || state.schedulingCallback} className="w-full h-7 text-xs bg-primary text-primary-foreground rounded hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-1">
+                                          {state.schedulingCallback && <Loader2 className="h-3 w-3 animate-spin" />}
+                                          {company.callback_at ? "Update follow up" : "Schedule + invite"}
+                                        </button>
+                                        {company.callback_at && (
+                                          <div className="space-y-1">
+                                            <p className="text-[10px] text-muted-foreground">Current: {new Date(company.callback_at).toLocaleString()}</p>
+                                            <button onClick={() => cancelFollowUp(company.id, company)} disabled={state.cancellingCallback || state.schedulingCallback} className="w-full h-7 text-xs border border-destructive/50 text-destructive rounded hover:bg-destructive/10 disabled:opacity-50 inline-flex items-center justify-center gap-1">
+                                              {state.cancellingCallback && <Loader2 className="h-3 w-3 animate-spin" />}
+                                              Cancel follow up
+                                            </button>
+                                          </div>
                                         )}
-                                        Save Contact
-                                      </button>
-                                    </div>
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* Meeting Notes */}
@@ -794,25 +961,52 @@ export function CampaignDetail({ id }: { id: string }) {
                                         <p className="text-xs text-muted-foreground italic">No notes yet.</p>
                                       ) : (
                                         state.notes.map((n) => (
-                                          <div
-                                            key={n.id}
-                                            className="text-xs bg-muted/40 rounded px-2 py-1.5"
-                                          >
+                                          <div key={n.id} className="text-xs bg-muted/40 rounded px-2 py-1.5 group">
                                             <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground mb-0.5">
-                                              <span className="font-medium">
-                                                {n.user_name ?? "Someone"}
-                                              </span>
-                                              <span>
-                                                {new Date(n.created_at).toLocaleString()}
-                                              </span>
+                                              <span className="font-medium">{n.user_name ?? "Someone"}</span>
+                                              <div className="flex items-center gap-1.5">
+                                                <span>{new Date(n.created_at).toLocaleString()}</span>
+                                                <button onClick={() => patchState(company.id, { editingNoteId: n.id, editingNoteContent: n.content })} className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground" title="Edit"><Pencil className="h-2.5 w-2.5" /></button>
+                                              </div>
                                             </div>
-                                            <p className="whitespace-pre-wrap">{n.content}</p>
+                                            {state.editingNoteId === n.id ? (
+                                              <div>
+                                                <textarea value={state.editingNoteContent} onChange={e => patchState(company.id, { editingNoteContent: e.target.value })} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); updateNote(company.id); } if (e.key === "Escape") patchState(company.id, { editingNoteId: null }); }} rows={2} autoFocus className="w-full text-xs bg-background border rounded px-2 py-1 resize-none focus:ring-1 focus:ring-primary outline-none mt-1" />
+                                                <div className="flex gap-1 mt-1">
+                                                  <button onClick={() => updateNote(company.id)} className="text-[10px] bg-primary text-primary-foreground rounded px-2 py-0.5">Save</button>
+                                                  <button onClick={() => patchState(company.id, { editingNoteId: null })} className="text-[10px] border rounded px-2 py-0.5 hover:bg-accent">Cancel</button>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <p className="whitespace-pre-wrap">{n.content}</p>
+                                            )}
                                           </div>
                                         ))
                                       )}
                                     </div>
                                   </div>
                                 </div>
+
+                                {/* Opening hours */}
+                                {(() => {
+                                  const weekHours = allHoursFormatted(company.working_hours);
+                                  if (!weekHours) return null;
+                                  return (
+                                    <div className="mt-4 pt-4 border-t">
+                                      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Opening Hours</div>
+                                      <table className="text-[11px] w-full max-w-xs">
+                                        <tbody>
+                                          {weekHours.map(({ day, hours, isToday }) => (
+                                            <tr key={day} className={isToday ? "font-medium" : "text-muted-foreground"}>
+                                              <td className="pr-3 w-10 opacity-80">{day}</td>
+                                              <td>{hours}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  );
+                                })()}
                               </td>
                             </tr>
                           )}
@@ -821,6 +1015,16 @@ export function CampaignDetail({ id }: { id: string }) {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {members.length > 0 && (
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Map</h2>
+                <CampaignMap
+                  members={validCompanies}
+                  orderedIds={members.map(m => m.company?.id).filter(Boolean) as string[]}
+                />
               </div>
             )}
           </>

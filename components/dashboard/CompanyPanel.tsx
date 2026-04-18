@@ -29,8 +29,10 @@ import {
   Loader2,
   Mail,
   MapPin,
+  Pencil,
   Phone,
   Star,
+  X,
 } from "lucide-react";
 import { openStatusLabel, allHoursFormatted } from "@/lib/hours";
 import { toast } from "sonner";
@@ -89,11 +91,15 @@ export function CompanyPanel({
   const [notInterestedReason, setNotInterestedReason] = useState<string | null>(
     null
   );
-  const [contact, setContact] = useState<Contact | null>(null);
-  const [contactName, setContactName] = useState<string>("");
-  const [contactEmail, setContactEmail] = useState<string>("");
-  const [contactPhone, setContactPhone] = useState<string>("");
-  const [contactNotes, setContactNotes] = useState<string>("");
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [contactFormName, setContactFormName] = useState("");
+  const [contactFormEmail, setContactFormEmail] = useState("");
+  const [contactFormPhone, setContactFormPhone] = useState("");
+  const [contactFormNotes, setContactFormNotes] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteContent, setEditingNoteContent] = useState("");
 
   const [followUpMethod, setFollowUpMethod] = useState<FollowUpMethod | "">("");
   const [callbackDate, setCallbackDate] = useState<Date | undefined>();
@@ -106,11 +112,15 @@ export function CompanyPanel({
   useEffect(() => {
     if (!company) return;
     setOutcomes(company.outcomes ?? []);
-    setContact(company.contact ?? null);
-    setContactName(company.contact?.name ?? "");
-    setContactEmail(company.contact?.email ?? "");
-    setContactPhone(company.contact?.phone ?? "");
-    setContactNotes(company.contact?.notes ?? "");
+    setContacts(company.contact ? [company.contact] : []);
+    setShowAddContact(false);
+    setEditingContactId(null);
+    setContactFormName("");
+    setContactFormEmail("");
+    setContactFormPhone("");
+    setContactFormNotes("");
+    setEditingNoteId(null);
+    setEditingNoteContent("");
     setNotInterestedReason(company.not_interested_reason ?? null);
     setFollowUpMethod((company.follow_up_method as FollowUpMethod) ?? "");
     setNoteInput("");
@@ -140,11 +150,23 @@ export function CompanyPanel({
     }
   }, []);
 
+  const fetchContacts = useCallback(async (companyId: string) => {
+    try {
+      const res = await fetch(`/api/companies/${companyId}/contact`);
+      if (!res.ok) return;
+      const data = (await res.json()) as { contacts: Contact[] };
+      setContacts(data.contacts);
+    } catch {
+      // silent
+    }
+  }, []);
+
   useEffect(() => {
     if (company && open) {
       fetchNotes(company.id);
+      fetchContacts(company.id);
     }
-  }, [company, open, fetchNotes]);
+  }, [company, open, fetchNotes, fetchContacts]);
 
   const postNote = async () => {
     if (!company || !noteInput.trim() || postingNote) return;
@@ -226,37 +248,94 @@ export function CompanyPanel({
     [company, outcomes, onUpdated]
   );
 
-  const saveContactField = useCallback(
-    async (next: {
-      name?: string | null;
-      email?: string | null;
-      phone?: string | null;
-      notes?: string | null;
-    }) => {
-      if (!company) return;
-      const payload = {
-        name: contact?.name ?? null,
-        email: contact?.email ?? null,
-        phone: contact?.phone ?? null,
-        notes: contact?.notes ?? null,
-        ...next,
-      };
-      try {
-        const res = await fetch(`/api/companies/${company.id}/contact`, {
+  const openAddForm = () => {
+    setEditingContactId(null);
+    setContactFormName("");
+    setContactFormEmail("");
+    setContactFormPhone("");
+    setContactFormNotes("");
+    setShowAddContact(true);
+  };
+
+  const openEditForm = (c: Contact) => {
+    setEditingContactId(c.id);
+    setContactFormName(c.name ?? "");
+    setContactFormEmail(c.email ?? "");
+    setContactFormPhone(c.phone ?? "");
+    setContactFormNotes(c.notes ?? "");
+    setShowAddContact(true);
+  };
+
+  const saveContactForm = useCallback(async () => {
+    if (!company) return;
+    const payload = {
+      name: contactFormName || null,
+      email: contactFormEmail || null,
+      phone: contactFormPhone || null,
+      notes: contactFormNotes || null,
+    };
+    try {
+      let res: Response;
+      if (editingContactId) {
+        res = await fetch(`/api/companies/${company.id}/contact?id=${editingContactId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) throw new Error("Failed");
-        const saved = (await res.json()) as Contact;
-        setContact(saved);
-        onUpdated(company.id, { contact: saved });
-      } catch {
-        toast.error("Failed to save contact");
+      } else {
+        res = await fetch(`/api/companies/${company.id}/contact`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
       }
-    },
-    [company, contact, onUpdated]
-  );
+      if (!res.ok) throw new Error("Failed");
+      const saved = (await res.json()) as Contact;
+      setContacts((prev) =>
+        editingContactId
+          ? prev.map((c) => (c.id === editingContactId ? saved : c))
+          : [...prev, saved]
+      );
+      onUpdated(company.id, { contact: contacts[0] ?? saved });
+      setShowAddContact(false);
+      setEditingContactId(null);
+    } catch {
+      toast.error("Failed to save contact");
+    }
+  }, [company, editingContactId, contactFormName, contactFormEmail, contactFormPhone, contactFormNotes, contacts, onUpdated]);
+
+  const deleteContact = useCallback(async (contactId: string) => {
+    if (!company) return;
+    try {
+      const res = await fetch(`/api/companies/${company.id}/contact?id=${contactId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed");
+      const next = contacts.filter((c) => c.id !== contactId);
+      setContacts(next);
+      onUpdated(company.id, { contact: next[0] ?? null });
+    } catch {
+      toast.error("Failed to delete contact");
+    }
+  }, [company, contacts, onUpdated]);
+
+  const saveNoteEdit = useCallback(async () => {
+    if (!company || !editingNoteId || !editingNoteContent.trim()) return;
+    try {
+      const res = await fetch(`/api/companies/${company.id}/notes`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noteId: editingNoteId, content: editingNoteContent.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const updated = (await res.json()) as Note;
+      setNotes((prev) => prev.map((n) => (n.id === editingNoteId ? updated : n)));
+      setEditingNoteId(null);
+      setEditingNoteContent("");
+    } catch {
+      toast.error("Failed to save note");
+    }
+  }, [company, editingNoteId, editingNoteContent]);
 
   const updateReason = async (value: string) => {
     if (!company) return;
@@ -290,32 +369,20 @@ export function CompanyPanel({
     }
   };
 
-  /**
-   * Compute the calendar event location + description fields from the
-   * selected follow-up method. If in-person → business address;
-   * if email → contact email; if phone → contact phone.
-   */
+  const primaryContact = contacts[0] ?? null;
+
   const computeCalendarFields = () => {
-    if (!company)
-      return { location: null, phone: null, address: null };
+    if (!company) return { location: null, phone: null, address: null };
     if (followUpMethod === "in_person") {
-      return {
-        location: company.address ?? null,
-        phone: null,
-        address: company.address ?? null,
-      };
+      return { location: company.address ?? null, phone: null, address: company.address ?? null };
     }
     if (followUpMethod === "email") {
-      return {
-        location: contactEmail || contact?.email || company.email || null,
-        phone: null,
-        address: null,
-      };
+      return { location: primaryContact?.email || company.email || null, phone: null, address: null };
     }
     if (followUpMethod === "phone") {
       return {
-        location: contactPhone || contact?.phone || company.phone || null,
-        phone: contactPhone || contact?.phone || company.phone || null,
+        location: primaryContact?.phone || company.phone || null,
+        phone: primaryContact?.phone || company.phone || null,
         address: null,
       };
     }
@@ -351,8 +418,8 @@ export function CompanyPanel({
             created_at: n.created_at,
             user_name: n.user_name,
           })),
-          contact: contact
-            ? { name: contact.name, email: contact.email, phone: contact.phone, notes: contact.notes }
+          contact: primaryContact
+            ? { name: primaryContact.name, email: primaryContact.email, phone: primaryContact.phone, notes: primaryContact.notes }
             : null,
         }),
       });
@@ -715,37 +782,29 @@ export function CompanyPanel({
                 <Label className="text-xs text-muted-foreground mb-1 block">
                   Method
                 </Label>
-                <Select
-                  value={followUpMethod || undefined}
-                  onValueChange={(v) => updateFollowUpMethod(v as FollowUpMethod)}
-                >
-                  <SelectTrigger className="w-full text-sm">
-                    <SelectValue placeholder="Choose method…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FOLLOW_UP_METHODS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {followUpMethod && (
-                  <button
-                    type="button"
-                    onClick={() => updateFollowUpMethod("")}
-                    className="text-[10px] text-muted-foreground hover:text-destructive mt-0.5"
-                  >
-                    Clear
-                  </button>
-                )}
+                <div className="flex gap-1">
+                  {FOLLOW_UP_METHODS.map((m) => (
+                    <button
+                      key={m.value}
+                      type="button"
+                      onClick={() => updateFollowUpMethod(followUpMethod === m.value ? "" : m.value)}
+                      className={`flex-1 px-2 py-1.5 text-xs rounded border transition-colors ${
+                        followUpMethod === m.value
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-card hover:bg-accent"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
                 {followUpMethod && (
                   <p className="text-[10px] text-muted-foreground mt-1">
                     {followUpMethod === "in_person"
                       ? `Where: ${company.address ?? "—"}`
                       : followUpMethod === "email"
-                        ? `Where: ${contactEmail || contact?.email || company.email || "—"}`
-                        : `Where: ${contactPhone || contact?.phone || company.phone || "—"}`}
+                        ? `To: ${primaryContact?.email || company.email || "—"}`
+                        : `Call: ${primaryContact?.phone || company.phone || "—"}`}
                   </p>
                 )}
               </div>
@@ -761,21 +820,12 @@ export function CompanyPanel({
                   className="rounded border bg-background"
                 />
                 <div className="flex-1 space-y-2 w-full">
-                  <Select
+                  <input
+                    type="time"
                     value={callbackTime}
-                    onValueChange={(v) => v && setCallbackTime(v)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIMES.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(e) => setCallbackTime(e.target.value)}
+                    className="w-full h-9 px-3 text-sm border rounded-md bg-background"
+                  />
                   <button
                     onClick={scheduleCallback}
                     disabled={!callbackDate || schedulingCallback || cancellingCallback}
@@ -813,63 +863,111 @@ export function CompanyPanel({
 
           <Separator />
 
-          {/* Contact */}
+          {/* Contacts */}
           <div className="space-y-3">
-            <Label className="text-sm font-semibold block">Contact</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Name</Label>
-                <Input
-                  value={contactName}
-                  onChange={(e) => setContactName(e.target.value)}
-                  onBlur={(e) => saveContactField({ name: e.target.value || null })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur();
-                  }}
-                  placeholder="e.g. Sarah Jones"
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Email</Label>
-                <Input
-                  type="email"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  onBlur={(e) => saveContactField({ email: e.target.value || null })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur();
-                  }}
-                  placeholder="name@example.com"
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Phone</Label>
-                <Input
-                  type="tel"
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  onBlur={(e) => saveContactField({ phone: e.target.value || null })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur();
-                  }}
-                  placeholder="+44 ..."
-                  className="h-8 text-sm font-mono"
-                />
-              </div>
+            <Label className="text-sm font-semibold block">Contacts</Label>
+
+            {/* Chips */}
+            <div className="flex flex-wrap gap-2 items-center">
+              {contacts.map((c) => (
+                <div
+                  key={c.id}
+                  className="group flex items-center gap-1.5 bg-muted rounded-full pl-3 pr-1.5 py-1"
+                >
+                  <div className="flex flex-col leading-tight">
+                    <span className="text-xs font-medium">{c.name || c.email || c.phone || "—"}</span>
+                    {(c.name && (c.email || c.phone)) && (
+                      <span className="text-[10px] text-muted-foreground">{c.email ?? c.phone}</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => openEditForm(c)}
+                    className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                    title="Edit"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => deleteContact(c.id)}
+                    className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {contacts.length === 0 && !showAddContact && (
+                <span className="text-xs text-muted-foreground italic">No contacts yet.</span>
+              )}
+              <button
+                onClick={openAddForm}
+                className="text-xs text-primary hover:underline"
+              >
+                + Add contact
+              </button>
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Notes</Label>
-              <Textarea
-                value={contactNotes}
-                onChange={(e) => setContactNotes(e.target.value)}
-                onBlur={(e) => saveContactField({ notes: e.target.value || null })}
-                placeholder="Anything worth remembering about this contact"
-                rows={2}
-                className="text-sm"
-              />
-            </div>
+
+            {/* Add / Edit form */}
+            {showAddContact && (
+              <div className="border rounded-md p-3 space-y-2 bg-muted/20">
+                <Label className="text-xs font-semibold">
+                  {editingContactId ? "Edit contact" : "New contact"}
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground mb-0.5 block">Name</Label>
+                    <Input
+                      value={contactFormName}
+                      onChange={(e) => setContactFormName(e.target.value)}
+                      placeholder="Sarah Jones"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground mb-0.5 block">Email</Label>
+                    <Input
+                      type="email"
+                      value={contactFormEmail}
+                      onChange={(e) => setContactFormEmail(e.target.value)}
+                      placeholder="sarah@example.com"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground mb-0.5 block">Phone</Label>
+                    <Input
+                      value={contactFormPhone}
+                      onChange={(e) => setContactFormPhone(e.target.value)}
+                      placeholder="+44 ..."
+                      className="h-7 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground mb-0.5 block">Notes</Label>
+                    <Input
+                      value={contactFormNotes}
+                      onChange={(e) => setContactFormNotes(e.target.value)}
+                      placeholder="Anything useful…"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveContactForm}
+                    className="flex-1 h-7 text-xs bg-primary text-primary-foreground rounded hover:opacity-90"
+                  >
+                    {editingContactId ? "Save changes" : "Add contact"}
+                  </button>
+                  <button
+                    onClick={() => { setShowAddContact(false); setEditingContactId(null); }}
+                    className="h-7 px-3 text-xs border rounded hover:bg-accent"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Prototype URL */}
@@ -930,15 +1028,44 @@ export function CompanyPanel({
                 notes.map((n) => (
                   <div
                     key={n.id}
-                    className="text-sm bg-muted/40 rounded px-2 py-1.5"
+                    className="text-sm bg-muted/40 rounded px-2 py-1.5 group"
                   >
                     <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground mb-0.5">
                       <span className="font-medium">
                         {n.user_name ?? n.user_email ?? "Someone"}
                       </span>
-                      <span>{new Date(n.created_at).toLocaleString()}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span>{new Date(n.created_at).toLocaleString()}</span>
+                        <button
+                          onClick={() => { setEditingNoteId(n.id); setEditingNoteContent(n.content); }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground"
+                          title="Edit note"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
-                    <p className="whitespace-pre-wrap">{n.content}</p>
+                    {editingNoteId === n.id ? (
+                      <div>
+                        <textarea
+                          value={editingNoteContent}
+                          onChange={(e) => setEditingNoteContent(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveNoteEdit(); }
+                            if (e.key === "Escape") { setEditingNoteId(null); }
+                          }}
+                          rows={2}
+                          autoFocus
+                          className="w-full text-xs bg-background border rounded px-2 py-1 resize-none focus:ring-1 focus:ring-primary outline-none mt-1"
+                        />
+                        <div className="flex gap-1 mt-1">
+                          <button onClick={saveNoteEdit} className="text-[10px] bg-primary text-primary-foreground rounded px-2 py-0.5 hover:opacity-90">Save</button>
+                          <button onClick={() => setEditingNoteId(null)} className="text-[10px] border rounded px-2 py-0.5 hover:bg-accent">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{n.content}</p>
+                    )}
                   </div>
                 ))
               )}

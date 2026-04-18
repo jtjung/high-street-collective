@@ -54,6 +54,7 @@ type CompanyPatch = {
   last_called_at?: string | null;
   not_interested_reason?: string | null;
   follow_up_method?: string | null;
+  prototype_url?: string | null;
 };
 
 const ALLOWED_FIELDS: Array<keyof CompanyPatch> = [
@@ -69,6 +70,7 @@ const ALLOWED_FIELDS: Array<keyof CompanyPatch> = [
   "last_called_at",
   "not_interested_reason",
   "follow_up_method",
+  "prototype_url",
 ];
 
 export async function PATCH(
