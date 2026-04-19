@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server-client";
 import { geocodeAddress } from "@/lib/geocode";
 
+export const maxDuration = 300; // seconds — Vercel Pro/Fluid max
+
 function buildQuery(c: {
   address: string | null;
   postal_code: string | null;
@@ -13,6 +15,36 @@ function buildQuery(c: {
   return parts.length ? parts.join(", ") : null;
 }
 
+/** GET — returns geocoding stats (total / geocoded / missing). */
+export async function GET() {
+  const { userId } = await getAuth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const supabase = getSupabaseAdmin();
+  const { count: total } = await supabase
+    .from("companies")
+    .select("*", { count: "exact", head: true });
+  const { count: geocoded } = await supabase
+    .from("companies")
+    .select("*", { count: "exact", head: true })
+    .not("latitude", "is", null);
+
+  const t = total ?? 0;
+  const g = geocoded ?? 0;
+  return NextResponse.json({ total: t, geocoded: g, missing: t - g });
+}
+
+/**
+ * POST — geocodes a batch of records.
+ *
+ * Body params:
+ *   limit    — how many records to process (default 50, 0 = all — use carefully)
+ *   offset   — row offset for paging (default 0)
+ *   forceAll — if true, re-geocode already-geocoded records too
+ *
+ * Returns:
+ *   { success, failed, skipped, total, nextOffset, done }
+ */
 export async function POST(req: Request) {
   const { userId } = await getAuth();
   if (!userId) {
@@ -20,38 +52,26 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const forceAll = body?.forceAll === true;
+  const forceAll: boolean = body?.forceAll === true;
+  const limit: number = typeof body?.limit === "number" ? body.limit : 50;
+  const offset: number = typeof body?.offset === "number" ? body.offset : 0;
 
   const supabase = getSupabaseAdmin();
 
-  const companies: {
-    id: string;
-    name: string | null;
-    address: string | null;
-    postal_code: string | null;
-    city: string | null;
-    country_code: string | null;
-  }[] = [];
+  let query = supabase
+    .from("companies")
+    .select("id, name, address, postal_code, city, country_code")
+    .order("created_at", { ascending: true })
+    .range(offset, limit > 0 ? offset + limit - 1 : offset + 999);
 
-  const pageSize = 1000;
-  let offset = 0;
-  while (true) {
-    let query = supabase
-      .from("companies")
-      .select("id, name, address, postal_code, city, country_code")
-      .order("created_at", { ascending: true })
-      .range(offset, offset + pageSize - 1);
-    if (!forceAll) query = query.is("latitude", null);
+  if (!forceAll) query = query.is("latitude", null);
 
-    const { data, error } = await query;
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-    companies.push(...(data ?? []));
-    if (!data || data.length < pageSize) break;
-    offset += pageSize;
+  const { data, error } = await query;
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const companies = data ?? [];
   let success = 0;
   let skipped = 0;
   let failed = 0;
@@ -94,5 +114,8 @@ export async function POST(req: Request) {
     await new Promise((resolve) => setTimeout(resolve, 1100));
   }
 
-  return NextResponse.json({ success, failed, skipped, total: companies.length });
+  const nextOffset = offset + companies.length;
+  const done = limit === 0 || companies.length < limit;
+
+  return NextResponse.json({ success, failed, skipped, total: companies.length, nextOffset, done });
 }

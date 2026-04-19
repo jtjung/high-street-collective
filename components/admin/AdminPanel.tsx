@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { UserButton } from "@clerk/nextjs";
@@ -11,6 +11,9 @@ import {
   AlertCircle,
   Loader2,
   ExternalLink,
+  MapPin,
+  Play,
+  Square,
 } from "lucide-react";
 import { NavTabs } from "@/components/NavTabs";
 import { Input } from "@/components/ui/input";
@@ -44,6 +47,19 @@ interface PostcodeStatusResponse {
 
 type Filter = "all" | "scraped" | "not_scraped" | "no_companies";
 
+interface GeocodeStats {
+  total: number;
+  geocoded: number;
+  missing: number;
+}
+
+interface GeocodeProgress {
+  success: number;
+  failed: number;
+  skipped: number;
+  processed: number;
+}
+
 export function AdminPanel({ adminEmail }: { adminEmail: string }) {
   const [data, setData] = useState<PostcodeStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +67,13 @@ export function AdminPanel({ adminEmail }: { adminEmail: string }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+
+  // Geocoding state
+  const [geocodeStats, setGeocodeStats] = useState<GeocodeStats | null>(null);
+  const [geocodeRunning, setGeocodeRunning] = useState(false);
+  const [geocodeStop, setGeocodeStop] = useState(false);
+  const [geocodeProgress, setGeocodeProgress] = useState<GeocodeProgress | null>(null);
+  const geocodeStopRef = useRef(false);
 
   const fetchStatus = useCallback(async () => {
     setRefreshing(true);
@@ -75,9 +98,60 @@ export function AdminPanel({ adminEmail }: { adminEmail: string }) {
     }
   }, []);
 
+  const fetchGeocodeStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/companies/geocode-all");
+      if (res.ok) setGeocodeStats(await res.json());
+    } catch {
+      // non-critical
+    }
+  }, []);
+
+  const startGeocoding = useCallback(async () => {
+    setGeocodeRunning(true);
+    setGeocodeStop(false);
+    geocodeStopRef.current = false;
+    setGeocodeProgress({ success: 0, failed: 0, skipped: 0, processed: 0 });
+
+    let offset = 0;
+    let cumSuccess = 0, cumFailed = 0, cumSkipped = 0, cumProcessed = 0;
+
+    while (true) {
+      if (geocodeStopRef.current) break;
+      try {
+        const res = await fetch("/api/companies/geocode-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ limit: 50, offset }),
+        });
+        if (!res.ok) { toast.error("Geocoding batch failed"); break; }
+        const batch = await res.json() as { success: number; failed: number; skipped: number; total: number; nextOffset: number; done: boolean };
+        cumSuccess += batch.success;
+        cumFailed += batch.failed;
+        cumSkipped += batch.skipped;
+        cumProcessed += batch.total;
+        offset = batch.nextOffset;
+        setGeocodeProgress({ success: cumSuccess, failed: cumFailed, skipped: cumSkipped, processed: cumProcessed });
+        if (batch.done || geocodeStopRef.current) break;
+      } catch {
+        toast.error("Geocoding request failed");
+        break;
+      }
+    }
+
+    setGeocodeRunning(false);
+    await fetchGeocodeStats();
+  }, [fetchGeocodeStats]);
+
+  const stopGeocoding = useCallback(() => {
+    geocodeStopRef.current = true;
+    setGeocodeStop(true);
+  }, []);
+
   useEffect(() => {
     fetchStatus();
-  }, [fetchStatus]);
+    fetchGeocodeStats();
+  }, [fetchStatus, fetchGeocodeStats]);
 
   const rows = useMemo(() => data?.rows ?? [], [data]);
 
@@ -137,6 +211,82 @@ export function AdminPanel({ adminEmail }: { adminEmail: string }) {
       </header>
 
       <div className="p-3 sm:p-4 space-y-4">
+        {/* Geocoding section */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5" />
+            Geocoding
+          </h2>
+          <div className="border rounded-lg p-3 bg-card space-y-3">
+            {geocodeStats ? (
+              <div className="flex items-center gap-4 flex-wrap text-sm">
+                <span>
+                  <span className="font-semibold">{geocodeStats.geocoded.toLocaleString()}</span>
+                  <span className="text-muted-foreground"> / {geocodeStats.total.toLocaleString()} geocoded</span>
+                </span>
+                <span className="text-muted-foreground">
+                  ({Math.round((geocodeStats.geocoded / Math.max(geocodeStats.total, 1)) * 100)}%)
+                </span>
+                {geocodeStats.missing > 0 && (
+                  <span className="text-amber-600 font-medium">{geocodeStats.missing.toLocaleString()} missing</span>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">Loading geocoding stats…</div>
+            )}
+
+            {geocodeProgress && (
+              <div className="space-y-1.5">
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  {geocodeStats && (
+                    <div
+                      className="h-full bg-green-500 transition-all"
+                      style={{ width: `${Math.min(100, Math.round(((geocodeStats.geocoded + geocodeProgress.success) / Math.max(geocodeStats.total, 1)) * 100))}%` }}
+                    />
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground flex gap-3">
+                  <span className="text-green-600 font-medium">+{geocodeProgress.success} success</span>
+                  {geocodeProgress.failed > 0 && <span className="text-destructive">+{geocodeProgress.failed} failed</span>}
+                  {geocodeProgress.skipped > 0 && <span>+{geocodeProgress.skipped} skipped</span>}
+                  <span>{geocodeProgress.processed} processed this run</span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              {geocodeRunning ? (
+                <>
+                  <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {geocodeStop ? "Stopping after this batch…" : "Geocoding in progress…"}
+                  </div>
+                  <button
+                    onClick={stopGeocoding}
+                    disabled={geocodeStop}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border rounded-md hover:bg-accent transition-colors disabled:opacity-60"
+                  >
+                    <Square className="h-3 w-3" />
+                    Stop
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={startGeocoding}
+                  disabled={!geocodeStats || geocodeStats.missing === 0}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60"
+                >
+                  <Play className="h-3 w-3" />
+                  {geocodeProgress ? "Resume geocoding" : "Start geocoding"}
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Uses Nominatim (OpenStreetMap) — 1 req/sec. Each batch of 50 takes ~55 seconds. Large runs will take several hours.
+            </p>
+          </div>
+        </section>
+
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
             London postcode scrape status
