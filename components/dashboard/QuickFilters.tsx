@@ -336,7 +336,7 @@ export function QuickFilters({
   };
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="flex items-center gap-1.5 flex-nowrap md:flex-wrap min-w-0">
       <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mr-1">
         Quick filters
       </span>

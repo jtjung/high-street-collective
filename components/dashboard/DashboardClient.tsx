@@ -522,8 +522,8 @@ export function DashboardClient() {
           </div>
         </div>
 
-        {/* Desktop: quick-filter chips for the most common columns */}
-        <div className="hidden md:block mt-2">
+        {/* Quick-filter chips */}
+        <div className="mt-2 overflow-x-auto pb-0.5">
           <QuickFilters
             companies={companies}
             columnFilters={columnFilters}
