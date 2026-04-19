@@ -890,6 +890,32 @@ export function CampaignDetail({ id }: { id: string }) {
                                   ))}
                                 </div>
                               )}
+                              {/* Mobile-only summary row */}
+                              <div className="sm:hidden mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                                {company.contact?.name && (
+                                  <span className="truncate max-w-[160px]">{company.contact.name}</span>
+                                )}
+                                {(() => {
+                                  const label = nextOpenLabel(company.working_hours);
+                                  if (!label) return null;
+                                  return (
+                                    <span className={label === "Open Now" ? "text-green-600 font-medium" : ""}>
+                                      {label}
+                                    </span>
+                                  );
+                                })()}
+                                {company.prototype_url && (
+                                  <a
+                                    href={company.prototype_url.startsWith("http") ? company.prototype_url : `https://${company.prototype_url}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-violet-600 hover:underline inline-flex items-center gap-0.5"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Prototype <ExternalLink className="h-2.5 w-2.5" />
+                                  </a>
+                                )}
+                              </div>
                             </td>
                             <td className="px-3 py-2 hidden sm:table-cell">
                               {company.contact?.name ? (
