@@ -39,6 +39,8 @@ export async function POST(req: Request) {
 
   const result = await geocodeAddress(query, {
     countryCode: (company.country_code ?? "gb").toLowerCase(),
+    postalCode: company.postal_code,
+    city: company.city,
   });
 
   if (!result) {

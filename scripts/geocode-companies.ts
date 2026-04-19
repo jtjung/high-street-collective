@@ -96,6 +96,8 @@ async function main() {
     try {
       const result = await geocodeAddress(q, {
         countryCode: (c.country_code ?? "gb").toLowerCase(),
+        postalCode: c.postal_code,
+        city: c.city,
       });
 
       if (!result) {
