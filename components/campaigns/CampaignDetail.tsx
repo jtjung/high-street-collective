@@ -104,6 +104,8 @@ type ExpandState = {
   loadingNotes: boolean;
   savingOutcome: boolean;
   postingNote: boolean;
+  prototypeUrl: string;
+  savingPrototype: boolean;
 };
 
 const OUTCOME_COLORS: Record<string, string> = {
@@ -380,6 +382,8 @@ export function CampaignDetail({ id }: { id: string }) {
           loadingNotes: true,
           savingOutcome: false,
           postingNote: false,
+          prototypeUrl: company.prototype_url ?? "",
+          savingPrototype: false,
         };
         setExpandStates((prev) => ({ ...prev, [companyId]: init }));
         try {
@@ -411,6 +415,32 @@ export function CampaignDetail({ id }: { id: string }) {
     },
     [expandedId, expandStates]
   );
+
+  const savePrototypeUrl = useCallback(async (companyId: string) => {
+    const state = expandStates[companyId];
+    if (!state) return;
+    patchState(companyId, { savingPrototype: true });
+    try {
+      const res = await fetch(`/api/companies/${companyId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prototype_url: state.prototypeUrl || null }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.company?.id === companyId
+            ? { ...m, company: { ...m.company!, prototype_url: state.prototypeUrl || null } }
+            : m
+        )
+      );
+      toast.success("Prototype URL saved");
+    } catch {
+      toast.error("Failed to save");
+    } finally {
+      patchState(companyId, { savingPrototype: false });
+    }
+  }, [expandStates, patchState]);
 
   const toggleOutcome = useCallback(
     async (companyId: string, value: string) => {
@@ -1015,6 +1045,38 @@ export function CampaignDetail({ id }: { id: string }) {
                                           </button>
                                         );
                                       })}
+                                    </div>
+
+                                    {/* Prototype URL */}
+                                    <div className="mt-4 pt-3 border-t">
+                                      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Prototype URL</div>
+                                      <div className="flex gap-1">
+                                        <input
+                                          type="url"
+                                          value={state.prototypeUrl}
+                                          onChange={(e) => patchState(company.id, { prototypeUrl: e.target.value })}
+                                          onKeyDown={(e) => { if (e.key === "Enter") savePrototypeUrl(company.id); }}
+                                          placeholder="https://…"
+                                          className="flex-1 h-7 px-2 text-xs border rounded outline-none focus:ring-1 focus:ring-primary bg-background font-mono"
+                                        />
+                                        <button
+                                          onClick={() => savePrototypeUrl(company.id)}
+                                          disabled={state.savingPrototype}
+                                          className="h-7 px-2.5 text-xs bg-primary text-primary-foreground rounded hover:opacity-90 disabled:opacity-60 shrink-0"
+                                        >
+                                          {state.savingPrototype ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                                        </button>
+                                      </div>
+                                      {state.prototypeUrl && (
+                                        <a
+                                          href={state.prototypeUrl.startsWith("http") ? state.prototypeUrl : `https://${state.prototypeUrl}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="mt-1 inline-flex items-center gap-1 text-[11px] text-violet-600 hover:underline"
+                                        >
+                                          Open <ExternalLink className="h-2.5 w-2.5" />
+                                        </a>
+                                      )}
                                     </div>
                                   </div>
 
