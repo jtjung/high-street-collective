@@ -65,6 +65,54 @@ export async function GET(
   return NextResponse.json({ campaign, members: enriched });
 }
 
+/** POST — add a company to the campaign. Body: { companyId: string } */
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { userId } = await getAuth();
+  if (!userId)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  const { companyId } = (await request.json()) as { companyId: string };
+  if (!companyId)
+    return NextResponse.json({ error: "companyId required" }, { status: 400 });
+
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("campaign_members")
+    .upsert({ campaign_id: id, company_id: companyId }, { onConflict: "campaign_id,company_id" });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true }, { status: 201 });
+}
+
+/** PATCH — remove a company from the campaign. Body: { removeMember: companyId } */
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { userId } = await getAuth();
+  if (!userId)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  const { removeMember } = (await request.json()) as { removeMember: string };
+  if (!removeMember)
+    return NextResponse.json({ error: "removeMember required" }, { status: 400 });
+
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("campaign_members")
+    .delete()
+    .eq("campaign_id", id)
+    .eq("company_id", removeMember);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
