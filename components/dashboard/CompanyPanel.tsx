@@ -401,36 +401,46 @@ export function CompanyPanel({
       dt.setHours(hh, mm, 0, 0);
 
       const existingEventId = company.calendar_event_id;
-      const isUpdate = !!existingEventId;
-
       const { location, phone, address } = computeCalendarFields();
 
-      const calRes = await fetch("/api/calendar/event", {
-        method: isUpdate ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...(isUpdate ? { eventId: existingEventId } : {}),
-          companyName: company.name,
-          phone,
-          address,
-          location,
-          method: followUpMethod || null,
-          startTime: dt.toISOString(),
-          notes: notes.map((n) => ({
-            content: n.content,
-            created_at: n.created_at,
-            user_name: n.user_name,
-          })),
-          contact: primaryContact
-            ? { name: primaryContact.name, email: primaryContact.email, phone: primaryContact.phone, notes: primaryContact.notes }
-            : null,
-        }),
-      });
+      const basePayload = {
+        companyName: company.name,
+        phone,
+        address,
+        location,
+        method: followUpMethod || null,
+        startTime: dt.toISOString(),
+        notes: notes.map((n) => ({
+          content: n.content,
+          created_at: n.created_at,
+          user_name: n.user_name,
+        })),
+        contact: primaryContact
+          ? { name: primaryContact.name, email: primaryContact.email, phone: primaryContact.phone, notes: primaryContact.notes }
+          : null,
+      };
 
-      let calendarEventId: string | null = existingEventId ?? null;
+      let calRes = existingEventId
+        ? await fetch("/api/calendar/event", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventId: existingEventId, ...basePayload }),
+          })
+        : null;
+
+      // PATCH failed (event deleted from Google Calendar) — fall back to creating a new one
+      if (!calRes?.ok) {
+        calRes = await fetch("/api/calendar/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(basePayload),
+        });
+      }
+
+      let calendarEventId: string | null = null;
       if (calRes.ok) {
         const calData = (await calRes.json()) as { eventId?: string };
-        calendarEventId = calData.eventId ?? calendarEventId;
+        calendarEventId = calData.eventId ?? null;
       }
 
       const patch = {
@@ -459,12 +469,10 @@ export function CompanyPanel({
 
       toast.success(
         calendarEventId
-          ? isUpdate
+          ? existingEventId
             ? "Follow up updated + calendar invite sent"
             : "Follow up scheduled + calendar invite sent"
-          : isUpdate
-            ? "Follow up updated"
-            : "Follow up scheduled"
+          : "Follow up saved"
       );
     } catch {
       toast.error("Failed to schedule follow up");

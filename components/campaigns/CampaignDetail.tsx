@@ -547,26 +547,38 @@ export function CampaignDetail({ id }: { id: string }) {
         const dt = new Date(state.callbackDate);
         dt.setHours(hh, mm, 0, 0);
         const existingEventId = company.calendar_event_id;
-        const isUpdate = !!existingEventId;
         let location: string | null = null;
         const primaryContact = state.contacts[0] ?? null;
         if (state.followUpMethod === "in_person") location = company.address ?? null;
         else if (state.followUpMethod === "email") location = primaryContact?.email || company.email || null;
         else if (state.followUpMethod === "phone") location = primaryContact?.phone || company.phone || null;
 
-        const calRes = await fetch("/api/calendar/event", {
-          method: isUpdate ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...(isUpdate ? { eventId: existingEventId } : {}),
-            companyName: company.name, phone: company.phone, address: company.address, location,
-            method: state.followUpMethod || null, startTime: dt.toISOString(),
-            notes: state.notes.map(n => ({ content: n.content, created_at: n.created_at, user_name: n.user_name })),
-            contact: primaryContact ? { name: primaryContact.name, email: primaryContact.email, phone: primaryContact.phone } : null,
-          }),
-        });
-        let calendarEventId: string | null = existingEventId ?? null;
-        if (calRes.ok) { const calData = (await calRes.json()) as { eventId?: string }; calendarEventId = calData.eventId ?? calendarEventId; }
+        const basePayload = {
+          companyName: company.name, phone: company.phone, address: company.address, location,
+          method: state.followUpMethod || null, startTime: dt.toISOString(),
+          notes: state.notes.map(n => ({ content: n.content, created_at: n.created_at, user_name: n.user_name })),
+          contact: primaryContact ? { name: primaryContact.name, email: primaryContact.email, phone: primaryContact.phone } : null,
+        };
+
+        let calRes = existingEventId
+          ? await fetch("/api/calendar/event", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ eventId: existingEventId, ...basePayload }),
+            })
+          : null;
+
+        // PATCH failed (event deleted from Google Calendar) — fall back to creating a new one
+        if (!calRes?.ok) {
+          calRes = await fetch("/api/calendar/event", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(basePayload),
+          });
+        }
+
+        let calendarEventId: string | null = null;
+        if (calRes.ok) { const calData = (await calRes.json()) as { eventId?: string }; calendarEventId = calData.eventId ?? null; }
 
         await fetch(`/api/companies/${companyId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ callback_at: dt.toISOString(), calendar_event_id: calendarEventId }) });
 
@@ -578,7 +590,7 @@ export function CampaignDetail({ id }: { id: string }) {
         } else {
           setMembers(prev => prev.map(m => m.company?.id === companyId ? { ...m, company: { ...m.company!, callback_at: dt.toISOString(), calendar_event_id: calendarEventId } } : m));
         }
-        toast.success(calendarEventId ? (isUpdate ? "Follow up updated + calendar invite sent" : "Follow up scheduled + calendar invite sent") : (isUpdate ? "Follow up updated" : "Follow up scheduled"));
+        toast.success(calendarEventId ? (existingEventId ? "Follow up updated + calendar invite sent" : "Follow up scheduled + calendar invite sent") : "Follow up saved");
       } catch { toast.error("Failed to schedule follow up"); }
       finally { patchState(companyId, { schedulingCallback: false }); }
     },
