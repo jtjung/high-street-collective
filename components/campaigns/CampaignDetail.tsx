@@ -99,6 +99,7 @@ type ExpandState = {
   contactFormEmail: string;
   contactFormPhone: string;
   contactFormNotes: string;
+  contactFormRole: string;
   noteInput: string;
   notes: NoteRow[];
   loadingNotes: boolean;
@@ -377,6 +378,7 @@ export function CampaignDetail({ id }: { id: string }) {
           contactFormEmail: "",
           contactFormPhone: "",
           contactFormNotes: "",
+          contactFormRole: "",
           noteInput: "",
           notes: [],
           loadingNotes: true,
@@ -480,12 +482,12 @@ export function CampaignDetail({ id }: { id: string }) {
     async (companyId: string) => {
       const state = expandStates[companyId];
       if (!state) return;
-      const payload = { name: state.contactFormName || null, email: state.contactFormEmail || null, phone: state.contactFormPhone || null, notes: state.contactFormNotes || null };
+      const payload = { name: state.contactFormName || null, email: state.contactFormEmail || null, phone: state.contactFormPhone || null, notes: state.contactFormNotes || null, role: state.contactFormRole || null };
       try {
         const res = await fetch(`/api/companies/${companyId}/contact`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         if (!res.ok) throw new Error("Failed");
         const saved = (await res.json()) as Contact;
-        patchState(companyId, { contacts: [...state.contacts, saved], showAddContact: false, contactFormName: "", contactFormEmail: "", contactFormPhone: "", contactFormNotes: "" });
+        patchState(companyId, { contacts: [...state.contacts, saved], showAddContact: false, contactFormName: "", contactFormEmail: "", contactFormPhone: "", contactFormNotes: "", contactFormRole: "" });
         toast.success("Contact added");
       } catch { toast.error("Failed to add contact"); }
     },
@@ -496,7 +498,7 @@ export function CampaignDetail({ id }: { id: string }) {
     async (companyId: string) => {
       const state = expandStates[companyId];
       if (!state || !state.editingContactId) return;
-      const payload = { name: state.contactFormName || null, email: state.contactFormEmail || null, phone: state.contactFormPhone || null, notes: state.contactFormNotes || null };
+      const payload = { name: state.contactFormName || null, email: state.contactFormEmail || null, phone: state.contactFormPhone || null, notes: state.contactFormNotes || null, role: state.contactFormRole || null };
       try {
         const res = await fetch(`/api/companies/${companyId}/contact?id=${state.editingContactId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         if (!res.ok) throw new Error("Failed");
@@ -1112,13 +1114,13 @@ export function CampaignDetail({ id }: { id: string }) {
                                     <div className="flex flex-wrap gap-1.5 items-center mb-2">
                                       {state.contacts.map((c) => (
                                         <div key={c.id} className="group flex items-center gap-1 bg-muted rounded-full pl-2.5 pr-1 py-0.5">
-                                          <span className="text-xs">{c.name || c.email || c.phone || "—"}</span>
-                                          <button onClick={() => patchState(company.id, { editingContactId: c.id, contactFormName: c.name ?? "", contactFormEmail: c.email ?? "", contactFormPhone: c.phone ?? "", contactFormNotes: c.notes ?? "", showAddContact: true })} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"><Pencil className="h-2.5 w-2.5" /></button>
+                                          <span className="text-xs">{c.name || c.email || c.phone || "—"}{c.role ? <span className="ml-1 text-[10px] text-muted-foreground">({c.role})</span> : null}</span>
+                                          <button onClick={() => patchState(company.id, { editingContactId: c.id, contactFormName: c.name ?? "", contactFormEmail: c.email ?? "", contactFormPhone: c.phone ?? "", contactFormNotes: c.notes ?? "", contactFormRole: c.role ?? "", showAddContact: true })} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"><Pencil className="h-2.5 w-2.5" /></button>
                                           <button onClick={() => deleteContact(company.id, c.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"><X className="h-2.5 w-2.5" /></button>
                                         </div>
                                       ))}
                                       {!state.showAddContact && (
-                                        <button onClick={() => patchState(company.id, { showAddContact: true, editingContactId: null, contactFormName: "", contactFormEmail: "", contactFormPhone: "", contactFormNotes: "" })} className="text-[11px] text-primary hover:underline">+ Add</button>
+                                        <button onClick={() => patchState(company.id, { showAddContact: true, editingContactId: null, contactFormName: "", contactFormEmail: "", contactFormPhone: "", contactFormNotes: "", contactFormRole: "" })} className="text-[11px] text-primary hover:underline">+ Add</button>
                                       )}
                                     </div>
                                     {state.showAddContact && (
@@ -1126,6 +1128,11 @@ export function CampaignDetail({ id }: { id: string }) {
                                         <input type="text" value={state.contactFormName} onChange={e => patchState(company.id, { contactFormName: e.target.value })} placeholder="Name" className="w-full h-7 px-2 text-xs border rounded outline-none focus:ring-1 focus:ring-primary bg-background" />
                                         <input type="email" value={state.contactFormEmail} onChange={e => patchState(company.id, { contactFormEmail: e.target.value })} placeholder="Email" className="w-full h-7 px-2 text-xs border rounded outline-none focus:ring-1 focus:ring-primary bg-background" />
                                         <input type="tel" value={state.contactFormPhone} onChange={e => patchState(company.id, { contactFormPhone: e.target.value })} placeholder="Phone" className="w-full h-7 px-2 text-xs border rounded font-mono outline-none focus:ring-1 focus:ring-primary bg-background" />
+                                        <div className="flex gap-1">
+                                          {["Manager", "Owner", "Server", "Unknown"].map((r) => (
+                                            <button key={r} type="button" onClick={() => patchState(company.id, { contactFormRole: state.contactFormRole === r ? "" : r })} className={`flex-1 h-6 text-[10px] rounded border transition-colors ${state.contactFormRole === r ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:bg-accent"}`}>{r}</button>
+                                          ))}
+                                        </div>
                                         <div className="flex gap-1">
                                           <button onClick={() => state.editingContactId ? updateContact(company.id) : addContact(company.id)} className="flex-1 h-7 text-xs bg-primary text-primary-foreground rounded hover:opacity-90">
                                             {state.editingContactId ? "Save" : "Add contact"}

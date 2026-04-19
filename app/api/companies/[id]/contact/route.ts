@@ -7,6 +7,7 @@ type ContactPayload = {
   email?: string | null;
   phone?: string | null;
   notes?: string | null;
+  role?: string | null;
 };
 
 export async function GET(
@@ -48,6 +49,7 @@ export async function POST(
       email: body.email ?? null,
       phone: body.phone ?? null,
       notes: body.notes ?? null,
+      role: body.role ?? null,
     })
     .select()
     .single();
@@ -74,6 +76,7 @@ export async function PUT(
     email: body.email ?? null,
     phone: body.phone ?? null,
     notes: body.notes ?? null,
+    role: body.role ?? null,
     updated_at: new Date().toISOString(),
   };
 
@@ -111,7 +114,7 @@ export async function PUT(
 
   const { data, error } = await supabase
     .from("contacts")
-    .insert({ company_id: companyId, name: body.name ?? null, email: body.email ?? null, phone: body.phone ?? null, notes: body.notes ?? null })
+    .insert({ company_id: companyId, name: body.name ?? null, email: body.email ?? null, phone: body.phone ?? null, notes: body.notes ?? null, role: body.role ?? null })
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

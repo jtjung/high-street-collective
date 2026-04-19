@@ -98,6 +98,7 @@ export function CompanyPanel({
   const [contactFormEmail, setContactFormEmail] = useState("");
   const [contactFormPhone, setContactFormPhone] = useState("");
   const [contactFormNotes, setContactFormNotes] = useState("");
+  const [contactFormRole, setContactFormRole] = useState<string>("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState("");
 
@@ -263,6 +264,7 @@ export function CompanyPanel({
     setContactFormEmail(c.email ?? "");
     setContactFormPhone(c.phone ?? "");
     setContactFormNotes(c.notes ?? "");
+    setContactFormRole(c.role ?? "");
     setShowAddContact(true);
   };
 
@@ -273,6 +275,7 @@ export function CompanyPanel({
       email: contactFormEmail || null,
       phone: contactFormPhone || null,
       notes: contactFormNotes || null,
+      role: contactFormRole || null,
     };
     try {
       let res: Response;
@@ -302,7 +305,7 @@ export function CompanyPanel({
     } catch {
       toast.error("Failed to save contact");
     }
-  }, [company, editingContactId, contactFormName, contactFormEmail, contactFormPhone, contactFormNotes, contacts, onUpdated]);
+  }, [company, editingContactId, contactFormName, contactFormEmail, contactFormPhone, contactFormNotes, contactFormRole, contacts, onUpdated]);
 
   const deleteContact = useCallback(async (contactId: string) => {
     if (!company) return;
@@ -876,9 +879,9 @@ export function CompanyPanel({
                 >
                   <div className="flex flex-col leading-tight">
                     <span className="text-xs font-medium">{c.name || c.email || c.phone || "—"}</span>
-                    {(c.name && (c.email || c.phone)) && (
-                      <span className="text-[10px] text-muted-foreground">{c.email ?? c.phone}</span>
-                    )}
+                    <span className="text-[10px] text-muted-foreground">
+                      {[c.role, c.email ?? c.phone].filter(Boolean).join(" · ")}
+                    </span>
                   </div>
                   <button
                     onClick={() => openEditForm(c)}
@@ -950,6 +953,21 @@ export function CompanyPanel({
                       placeholder="Anything useful…"
                       className="h-7 text-xs"
                     />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-[10px] text-muted-foreground mb-0.5 block">Role</Label>
+                    <div className="flex gap-1">
+                      {["Manager", "Owner", "Server", "Unknown"].map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setContactFormRole(contactFormRole === r ? "" : r)}
+                          className={`flex-1 h-7 text-xs rounded border transition-colors ${contactFormRole === r ? "bg-primary text-primary-foreground border-primary" : "bg-card hover:bg-accent"}`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-2">
