@@ -442,6 +442,33 @@ export type Database = {
           },
         ]
       }
+      journal_entries: {
+        Row: {
+          id: string
+          entry_date: string
+          content: string
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          entry_date: string
+          content: string
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          entry_date?: string
+          content?: string
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       outscraper_sync_log: {
         Row: {
           completed_at: string | null

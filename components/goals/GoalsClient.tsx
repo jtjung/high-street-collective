@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import { NavTabs } from "@/components/NavTabs";
-import { Check, Pencil, TrendingUp, X } from "lucide-react";
+import { Check, Pencil, TrendingUp, X, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 type GoalsData = {
   settings: {
@@ -119,10 +120,28 @@ function InlineNumberEdit({
   );
 }
 
+type JournalEntry = {
+  id: string;
+  entry_date: string;
+  content: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export function GoalsClient() {
   const [data, setData] = useState<GoalsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Journal state
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [journalDate, setJournalDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [journalText, setJournalText] = useState("");
+  const [savingEntry, setSavingEntry] = useState(false);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState("");
+  const journalRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -138,7 +157,63 @@ export function GoalsClient() {
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const fetchJournal = useCallback(async () => {
+    try {
+      const res = await fetch("/api/journal");
+      if (res.ok) setEntries(((await res.json()) as { entries: JournalEntry[] }).entries);
+    } catch { /* non-critical */ }
+  }, []);
+
+  useEffect(() => { fetchData(); fetchJournal(); }, [fetchData, fetchJournal]);
+
+  const saveJournalEntry = useCallback(async () => {
+    if (!journalText.trim()) return;
+    setSavingEntry(true);
+    try {
+      const res = await fetch("/api/journal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entry_date: journalDate, content: journalText.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const saved = (await res.json()) as JournalEntry;
+      setEntries((prev) => [saved, ...prev].sort((a, b) => b.entry_date.localeCompare(a.entry_date)));
+      setJournalText("");
+      toast.success("Entry saved");
+    } catch {
+      toast.error("Failed to save entry");
+    } finally {
+      setSavingEntry(false);
+    }
+  }, [journalDate, journalText]);
+
+  const saveEdit = useCallback(async () => {
+    if (!editingEntryId || !editingContent.trim()) return;
+    try {
+      const res = await fetch("/api/journal", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingEntryId, content: editingContent.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const updated = (await res.json()) as JournalEntry;
+      setEntries((prev) => prev.map((e) => (e.id === editingEntryId ? updated : e)));
+      setEditingEntryId(null);
+    } catch {
+      toast.error("Failed to update entry");
+    }
+  }, [editingEntryId, editingContent]);
+
+  const deleteEntry = useCallback(async (id: string) => {
+    if (!confirm("Delete this journal entry?")) return;
+    try {
+      const res = await fetch(`/api/journal?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed");
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+    } catch {
+      toast.error("Failed to delete entry");
+    }
+  }, []);
 
   async function saveSetting(key: "price_per_customer_gbp" | "monthly_mrr_goal_gbp", value: number) {
     await fetch("/api/goals/settings", {
@@ -358,6 +433,97 @@ export function GoalsClient() {
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Journal */}
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="px-4 py-3 border-b bg-muted/30">
+            <h2 className="text-sm font-semibold">Journal</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Record what happened, what you tried, what worked.</p>
+          </div>
+          <div className="p-4 space-y-3">
+            {/* New entry form */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={journalDate}
+                  onChange={(e) => setJournalDate(e.target.value)}
+                  className="h-8 px-2 text-sm border rounded-md bg-background"
+                />
+                <span className="text-xs text-muted-foreground">
+                  {new Date(journalDate + "T12:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
+                </span>
+              </div>
+              <textarea
+                ref={journalRef}
+                value={journalText}
+                onChange={(e) => setJournalText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveJournalEntry(); } }}
+                placeholder="What happened today? What did you try? What worked?  ⌘↵ to save"
+                rows={3}
+                className="w-full px-3 py-2 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <button
+                onClick={saveJournalEntry}
+                disabled={savingEntry || !journalText.trim()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-60 transition-colors"
+              >
+                {savingEntry && <Loader2 className="h-3 w-3 animate-spin" />}
+                Save entry
+              </button>
+            </div>
+
+            {/* Entry list */}
+            {entries.length > 0 && (
+              <div className="space-y-3 pt-2 border-t">
+                {entries.map((entry) => {
+                  const isEditing = editingEntryId === entry.id;
+                  return (
+                    <div key={entry.id} className="group space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {new Date(entry.entry_date + "T12:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                          {entry.created_by && <span className="ml-1.5 font-normal">· {entry.created_by.split("@")[0]}</span>}
+                        </span>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {!isEditing && (
+                            <button onClick={() => { setEditingEntryId(entry.id); setEditingContent(entry.content); }} className="text-muted-foreground hover:text-foreground" title="Edit">
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          )}
+                          <button onClick={() => deleteEntry(entry.id)} className="text-muted-foreground hover:text-destructive" title="Delete">
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                      {isEditing ? (
+                        <div className="space-y-1.5">
+                          <textarea
+                            autoFocus
+                            value={editingContent}
+                            onChange={(e) => setEditingContent(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveEdit(); } if (e.key === "Escape") setEditingEntryId(null); }}
+                            rows={3}
+                            className="w-full px-3 py-2 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                          />
+                          <div className="flex gap-1.5">
+                            <button onClick={saveEdit} className="px-2.5 py-1 text-xs bg-primary text-primary-foreground rounded hover:opacity-90">Save</button>
+                            <button onClick={() => setEditingEntryId(null)} className="px-2.5 py-1 text-xs border rounded hover:bg-accent">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{entry.content}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {entries.length === 0 && (
+              <p className="text-xs text-muted-foreground italic pt-1">No entries yet. Write your first one above.</p>
+            )}
+          </div>
         </div>
 
       </div>
