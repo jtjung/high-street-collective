@@ -2,7 +2,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 
 // Admin emails — configurable via env var, with a small hardcoded default
 // fallback so the app works out of the box for the founders.
-const DEFAULT_ADMIN_EMAILS = ["jtj0828@gmail.com"];
+const DEFAULT_ADMIN_EMAILS = ["jt@highstreetcollective.org", "nils@highstreetcollective.org"];
 
 function getAdminEmails(): string[] {
   const fromEnv = process.env.ADMIN_EMAILS;
